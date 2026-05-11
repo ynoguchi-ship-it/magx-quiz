@@ -42,6 +42,12 @@
         description: 'ハインリッヒの法則や危険予知など、労働災害を防ぐための知識を確認します。'
       },
       {
+        id: 'maintenance', name: '設備保全',
+        icon: <i className="fa-solid fa-wrench text-3xl text-cyan-400"></i>,
+        theme: { borderHover: 'hover:border-cyan-500', shadowHover: 'hover:shadow-cyan-900/20', bgLight: 'bg-cyan-500/10', borderGroupHover: 'group-hover:border-cyan-500/50', text: 'text-cyan-400', bgBtn: 'bg-cyan-600', bgBtnHover: 'hover:bg-cyan-500', bgProgress: 'bg-cyan-500' },
+        description: '設備の安定稼働に欠かせないTPM、予防保全、自主保全などの知識を学びます。'
+      },
+      {
         id: 'plastic_magnet', name: '製品知識 (プラマグ)',
         icon: <i className="fa-solid fa-magnet text-3xl text-purple-400"></i>,
         theme: { borderHover: 'hover:border-purple-500', shadowHover: 'hover:shadow-purple-900/20', bgLight: 'bg-purple-500/10', borderGroupHover: 'group-hover:border-purple-500/50', text: 'text-purple-400', bgBtn: 'bg-purple-600', bgBtnHover: 'hover:bg-purple-500', bgProgress: 'bg-purple-500' },
@@ -106,6 +112,25 @@
         { question: "保護具の中で、騒音レベルが高い職場で聴力障害を防ぐために着用するものは？", options: ["保護メガネ", "耳栓・イヤーマフ", "防塵マスク", "安全靴"], answer: 1, explanation: "騒音性難聴は徐々に進行するため自覚しにくく、一度失われた聴力は回復しません。そのため耳栓などの保護具着用が必須です。" },
         { question: "機械のカバーが開いていると機械が動かない、あるいは動いている時にカバーを開けると自動停止する安全装置を何と呼ぶ？", options: ["ポカヨケ", "インターロック", "アンドン", "ブレーカー"], answer: 1, explanation: "インターロック機構により、「人間の不注意」があっても機械的に危険な状態を回避する仕組みです。" },
         { question: "職場の安全や衛生状態を確認し、改善点を見つけるために定期的に現場を見回る活動は？", options: ["安全パトロール", "朝礼", "棚卸し", "工程内検査"], answer: 0, explanation: "安全管理者や委員が現場を巡回し、不安全な状態（危険箇所）や不安全な行動（ルール違反）がないかを確認し、改善を促す活動です。" }
+      ],
+      'maintenance': [
+        { question: "設備保全において「機械が故障してから修理する」という考え方を何と呼びますか？", options: ["事後保全", "予防保全", "予知保全", "改良保全"], answer: 0, explanation: "故障が起きてから対応するのが事後保全（Breakdown Maintenance）です。予期せぬライン停止を引き起こすため、できるだけ減らすべきとされます。" },
+        { question: "設備の故障を未然に防ぐため、定期的な点検や部品交換を行う保全手法は？", options: ["事後保全", "予防保全", "自主保全", "予知保全"], answer: 1, explanation: "車検のように、あらかじめ計画を立てて点検・交換を行うのが予防保全（Preventive Maintenance）です。" },
+        { question: "設備の状態をセンサーなどで常に監視し、故障の兆候を捉えてからメンテナンスを行う手法は？", options: ["事後保全", "予防保全", "予知保全", "自主保全"], answer: 2, explanation: "予知保全（Predictive Maintenance）は、振動や温度などのデータを分析し、部品の寿命が尽きる直前に最適なタイミングで交換する高度な手法です。" },
+        { question: "「自分の設備は自分で守る」というスローガンのもと、現場のオペレーター（作業者）自身が日常の点検や清掃、給油などを行う活動を何と呼びますか？", options: ["自主保全", "専門保全", "改良保全", "事後保全"], answer: 0, explanation: "現場で機械を一番よく知っている作業者が、清掃・給油・増し締めなどの日常的なメンテナンスを行うのが自主保全です。" },
+        { question: "全社を挙げて生産設備の効率を極限まで高めるための活動「TPM」。この『P』は何の略？", options: ["Productive（生産的）", "Preventive（予防的）", "Predictive（予知的）", "Plan（計画）"], answer: 0, explanation: "TPMは「Total Productive Maintenance（全員参加の生産保全）」の略です。設備のロスをゼロにすることを目指します。" },
+        { question: "TPM活動において、設備の効率を低下させる「設備の6大ロス」に含まれないものはどれですか？", options: ["故障ロス", "段取り・調整ロス", "チョコ停・空転ロス", "人件費ロス"], answer: 3, explanation: "設備の6大ロスは「故障、段取り・調整、刃具（立ち上がり）、チョコ停・空転、速度低下、不良・手直し」です。人件費は設備そのもののロスではありません。" },
+        { question: "設備の総合的な効率を示す指標「OEE（設備総合効率）」。『稼働率』『性能稼働率』ともう一つ掛け合わせるものは？", options: ["良品率", "出勤率", "利益率", "回転率"], answer: 0, explanation: "OEE ＝ 稼働率 × 性能稼働率 × 良品率 で計算されます。この数字をいかに100%に近づけるかが設備保全の目標です。" },
+        { question: "機械の回転部や摩擦部などに、摩耗を防ぎ動きを滑らかにする目的で油をさすことを何と呼びますか？", options: ["給油（潤滑）", "冷却", "洗浄", "防錆"], answer: 0, explanation: "潤滑不良は機械の寿命を著しく縮め、故障の大きな原因となります。「正しい油を、正しい量、正しいタイミングで」給油することが重要です。" },
+        { question: "ネジやボルトが振動などで緩んでいないかを確認し、適正な力で締め直す作業を何と呼ぶ？", options: ["増し締め", "仮締め", "本締め", "トルク管理"], answer: 0, explanation: "日常点検の中で、振動の多い箇所のボルトに緩みがないか確認し、増し締めを行うことは、重大な故障を防ぐ第一歩です。" },
+        { question: "保全の観点での「清掃」の最も重要な目的はどれですか？", options: ["工場見学の際に見栄えを良くするため", "清掃を通じて、設備の微小な欠陥（キズ、ガタつき、油漏れなど）を発見するため", "作業者の運動不足を解消するため", "清掃業者のコストを削減するため"], answer: 1, explanation: "TPMにおいて「清掃は点検なり」と言われます。汚れを落とすだけでなく、隠れていた設備の異常を見つけ出すのが真の目的です。" },
+        { question: "設備の一部を改造し、そもそも故障しにくい構造にしたり、メンテナンスをやりやすくしたりする活動を何と呼ぶ？", options: ["改良保全", "事後保全", "定期保全", "日常保全"], answer: 0, explanation: "故障が起きた際、単に部品を新品に交換するだけでなく「なぜ壊れたか」を追求し、より強い構造に改善していくのが改良保全です。" },
+        { question: "機械が正常に動いている時の音、振動、温度などの状態を、感覚ではなく数値化して管理する基準を何と呼ぶ？", options: ["管理基準", "異常値", "設計値", "理論値"], answer: 0, explanation: "「いつもより熱い」「変な音がする」という感覚を、「○度以下」「○デシベル以下」といった明確な管理基準にすることが予知保全に繋がります。" },
+        { question: "設備保全に使う交換用の部品（スペアパーツ）の管理について、最も適切な考え方は？", options: ["故障してから発注すればよい", "すべての部品を大量に在庫しておくべき", "故障頻度や納期の長さに応じて、必要な重要部品のみ適正な数を在庫する", "古い機械の部品はすべて捨ててしまう"], answer: 2, explanation: "すべての部品を持つのはコストがかかりすぎ、持たなすぎると長時間ラインが止まります。リスクを評価した「予備品管理」が重要です。" },
+        { question: "日常点検を確実に行うために、点検する箇所、項目、方法などを一覧表にしたものを何と呼ぶ？", options: ["点検チェックシート", "作業手順書", "QC工程表", "生産計画書"], answer: 0, explanation: "誰がやっても同じように点検ができるよう、チェックシートに基づいた点検を標準化することが重要です。" },
+        { question: "メーターなどの計器類において、正常な範囲（適正値）と異常な範囲が一目でわかるように、色付きのテープなどを貼る工夫を何と呼ぶ？", options: ["見える化（限界表示）", "ブラックボックス化", "デジタル化", "マスキング"], answer: 0, explanation: "正常範囲を緑色、異常範囲を赤色でマーキングしておくことで、熟練者でなくても「異常」を瞬時に発見できるようになります。" },
+        { question: "設備の故障原因を根本から解決するために、「なぜ」を複数回繰り返して真因を追求する手法を何と呼ぶ？", options: ["なぜなぜ分析", "PDCAサイクル", "KYT", "5S活動"], answer: 0, explanation: "「なぜ機械が止まった？→ヒューズが切れたから→なぜ切れた？→過電流が流れたから…」と深掘りし、表面的な対策ではなく再発防止策を導き出します。" },
+        { question: "空気圧を利用して機械を動かす装置（エアシリンダなど）において、空気が漏れている状態を示す「エア漏れ」の主な原因はどれか？", options: ["パッキンやシールの劣化", "電気コードの断線", "モーターの焼き付き", "潤滑油の入れすぎ"], answer: 0, explanation: "エア漏れは「シュー」という音で発見できます。パッキンなどの経年劣化が主な原因であり、放置するとエネルギーの大きなムダ（電気代ロス）に繋がります。" }
       ],
       'plastic_magnet': [
         { question: "プラスチックマグネット（ボンド磁石）は、主に何と何を混ぜ合わせて作られますか？", options: ["鉄とアルミニウム", "磁性粉（フェライトなど）と樹脂（プラスチックやゴム）", "銅とプラスチック", "希土類元素とガラス"], answer: 1, explanation: "磁石の粉末（磁性粉）に、つなぎ（バインダー）としてプラスチックやゴムなどの樹脂を練り込んで作られます。" },
@@ -209,7 +234,6 @@
         }
       };
 
-      // ★修正箇所：スコアを正確に保存して、画面を切り替えるように直しました
       const nextQuestion = () => {
         if (currentQuestionIndex + 1 < currentQuizList.length) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -217,15 +241,14 @@
           setIsAnswered(false);
           window.scrollTo(0,0);
         } else {
-          // 現在のスコアをそのまま保存します（重複加算を修正）
-          saveScoreToLocal(activeCategory, score);
+          saveScoreToLocal(activeCategory, score + (selectedOption === currentQuizList[currentQuestionIndex].answer ? 1 : 0));
           setView('result');
           window.scrollTo(0,0);
         }
       };
 
       const TitleScreen = () => (
-        <div className="max-w-4xl mx-auto py-12 px-4 animate-fadeIn">
+        <div className="max-w-5xl mx-auto py-12 px-4 animate-fadeIn">
           <div className="text-center mb-12 sm:mb-16">
             <div className="inline-flex items-center justify-center p-4 sm:p-5 bg-blue-600 rounded-2xl mb-4 sm:mb-6 shadow-lg shadow-blue-900/50">
               <i className="fa-solid fa-book-open text-3xl sm:text-4xl text-white"></i>
@@ -239,7 +262,7 @@
               カテゴリを選ぶと、毎回<span className="text-yellow-400 font-bold">ランダムに10問</span>が出題されます。
             </p>
           </div>
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {QUIZ_CATEGORIES.map((category) => {
               const previousScore = savedScores[category.id];
               return (
@@ -374,7 +397,6 @@
                   {wrongAnswers.map((item, idx) => (
                     <div key={idx} className="bg-slate-900 p-5 rounded-xl border border-slate-700">
                       <p className="font-bold text-slate-200 mb-4 leading-relaxed">Q. {item.question}</p>
-                      
                       <div className="grid sm:grid-cols-2 gap-4 mb-4 text-sm">
                         <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
                           <span className="block text-red-400 font-bold mb-1"><i className="fa-solid fa-xmark"></i> あなたの回答</span>
@@ -385,7 +407,6 @@
                           <span className="text-slate-300">{item.correctOption}</span>
                         </div>
                       </div>
-                      
                       <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-500/30">
                         <p className="text-blue-300 font-bold mb-1 text-sm"><i className="fa-solid fa-lightbulb"></i> 解説</p>
                         <p className="text-slate-300 text-sm leading-relaxed">{item.explanation}</p>
