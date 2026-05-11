@@ -128,7 +128,6 @@
       ]
     };
 
-    // 配列をシャッフルする関数
     const shuffleArray = (array) => {
       const newArray = [...array];
       for (let i = newArray.length - 1; i > 0; i--) {
@@ -138,7 +137,6 @@
       return newArray;
     };
 
-    // 1回のプレイで出題する問題数
     const QUESTIONS_PER_PLAY = 10;
 
     const App = () => {
@@ -150,22 +148,26 @@
       const [selectedOption, setSelectedOption] = useState(null);
       const [isAnswered, setIsAnswered] = useState(false);
       
-      // 新規追加：間違えた問題のリストを保持する
-      const [wrongQuestions, setWrongQuestions] = useState([]);
-      // 新規追加：過去のスコア履歴を保持する
-      const [history, setHistory] = useState({});
-
-      // 初回読み込み時にローカルストレージから履歴を取得
-      useEffect(() => {
-        const savedHistory = localStorage.getItem('quizHistory');
-        if (savedHistory) {
-          try {
-            setHistory(JSON.parse(savedHistory));
-          } catch (e) {
-            console.error("履歴の読み込みに失敗しました");
-          }
+      const [wrongAnswers, setWrongAnswers] = useState([]);
+      const [savedScores, setSavedScores] = useState(() => {
+        try {
+          const item = window.localStorage.getItem('maguex_quiz_scores');
+          return item ? JSON.parse(item) : {};
+        } catch (error) {
+          console.error(error);
+          return {};
         }
-      }, []);
+      });
+
+      const saveScoreToLocal = (categoryId, newScore) => {
+        try {
+          const updatedScores = { ...savedScores, [categoryId]: newScore };
+          setSavedScores(updatedScores);
+          window.localStorage.setItem('maguex_quiz_scores', JSON.stringify(updatedScores));
+        } catch (error) {
+          console.error("保存に失敗しました", error);
+        }
+      };
 
       const startQuiz = (categoryId) => {
         setActiveCategory(categoryId);
@@ -176,7 +178,7 @@
         setScore(0);
         setSelectedOption(null);
         setIsAnswered(false);
-        setWrongQuestions([]); // 間違えた問題をリセット
+        setWrongAnswers([]);
         setView('quiz');
         window.scrollTo(0,0);
       };
@@ -185,6 +187,7 @@
         setView('title');
         setActiveCategory(null);
         setCurrentQuizList([]);
+        setWrongAnswers([]);
         window.scrollTo(0,0);
       };
 
@@ -197,11 +200,16 @@
         if (index === currentQ.answer) {
           setScore(score + 1);
         } else {
-          // 不正解の場合は間違えたリストに追加
-          setWrongQuestions([...wrongQuestions, currentQ]);
+          setWrongAnswers(prev => [...prev, {
+            question: currentQ.question,
+            correctOption: currentQ.options[currentQ.answer],
+            wrongOption: currentQ.options[index],
+            explanation: currentQ.explanation
+          }]);
         }
       };
 
+      // ★修正箇所：スコアを正確に保存して、画面を切り替えるように直しました
       const nextQuestion = () => {
         if (currentQuestionIndex + 1 < currentQuizList.length) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -209,7 +217,7 @@
           setIsAnswered(false);
           window.scrollTo(0,0);
         } else {
-          // クイズ終了時にスコアを保存
+          // 現在のスコアをそのまま保存します（重複加算を修正）
           saveScoreToLocal(activeCategory, score);
           setView('result');
           window.scrollTo(0,0);
@@ -233,25 +241,26 @@
           </div>
           <div className="grid md:grid-cols-2 gap-6">
             {QUIZ_CATEGORIES.map((category) => {
-              // 履歴から前回のスコアを取得
-              const prevScore = history[category.id];
+              const previousScore = savedScores[category.id];
               return (
-                <button key={category.id} onClick={() => startQuiz(category.id)} className={`bg-slate-800 border-2 border-slate-700 ${category.theme.borderHover} rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${category.theme.shadowHover} group relative overflow-hidden flex flex-col`}>
-                  <div className={`absolute top-0 right-0 w-32 h-32 ${category.theme.bgLight} rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110`}></div>
-                  <div className="relative z-10 flex-1">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className={`w-14 h-14 bg-slate-900 rounded-xl flex items-center justify-center border border-slate-700 ${category.theme.borderGroupHover} transition-colors`}>{category.icon}</div>
-                      {/* 前回のスコア表示 */}
-                      {prevScore !== undefined && (
-                        <div className="bg-slate-900/80 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-full flex items-center gap-1">
-                          <i className="fa-solid fa-clock-rotate-left text-slate-400"></i> 前回: <span className="font-bold text-white">{prevScore}</span>/{QUESTIONS_PER_PLAY}
-                        </div>
-                      )}
+                <button key={category.id} onClick={() => startQuiz(category.id)} className={`bg-slate-800 border-2 border-slate-700 ${category.theme.borderHover} rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${category.theme.shadowHover} group relative overflow-hidden flex flex-col justify-between h-full`}>
+                  <div>
+                    <div className={`absolute top-0 right-0 w-32 h-32 ${category.theme.bgLight} rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110`}></div>
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className={`w-14 h-14 bg-slate-900 rounded-xl flex items-center justify-center border border-slate-700 ${category.theme.borderGroupHover} transition-colors`}>{category.icon}</div>
+                        {previousScore !== undefined && (
+                          <div className="bg-slate-900 px-3 py-1 rounded-full border border-slate-700 text-xs font-semibold">
+                            <span className="text-slate-400">前回: </span>
+                            <span className={previousScore >= 8 ? "text-emerald-400" : "text-amber-400"}>{previousScore} / 10問</span>
+                          </div>
+                        )}
+                      </div>
+                      <h2 className="text-xl font-bold text-white mb-2">{category.name}</h2>
+                      <p className="text-sm text-slate-400 leading-relaxed mb-6">{category.description}</p>
                     </div>
-                    <h2 className="text-xl font-bold text-white mb-2">{category.name}</h2>
-                    <p className="text-sm text-slate-400 leading-relaxed mb-6">{category.description}</p>
                   </div>
-                  <div className={`relative z-10 flex items-center ${category.theme.text} font-semibold text-sm mt-auto pt-4 border-t border-slate-700/50`}>
+                  <div className={`relative z-10 flex items-center ${category.theme.text} font-semibold text-sm mt-auto`}>
                     クイズを開始 <i className="fa-solid fa-chevron-right ml-1 group-hover:translate-x-1 transition-transform"></i>
                   </div>
                 </button>
@@ -325,17 +334,16 @@
         const percentage = Math.round((score / currentQuizList.length) * 100);
         let resultTitle, resultDesc, color;
         if (percentage === 100) { resultTitle = "パーフェクト！"; resultDesc = "素晴らしい成績です！知識は完璧に身についています。"; color = "text-yellow-400"; }
-        else if (percentage >= 60) { resultTitle = "合格レベル！"; resultDesc = "基礎は身についています。間違えた箇所を復習しましょう。"; color = "text-emerald-400"; }
-        else { resultTitle = "もう少しがんばりましょう"; resultDesc = "解説をもう一度よく読み、基礎から復習することをおすすめします。"; color = "text-amber-400"; }
+        else if (percentage >= 80) { resultTitle = "合格レベル！"; resultDesc = "基礎は身についています。間違えた箇所を復習しましょう。"; color = "text-emerald-400"; }
+        else { resultTitle = "もう少しがんばりましょう"; resultDesc = "間違えた箇所をしっかり復習して、基礎を固めることをおすすめします。"; color = "text-amber-400"; }
 
         return (
-          <div className="max-w-3xl mx-auto py-16 px-4 text-center animate-fadeIn">
-            <div className="bg-slate-800 border border-slate-700 rounded-3xl p-8 sm:p-10 shadow-2xl relative overflow-hidden">
+          <div className="max-w-3xl mx-auto py-12 px-4 animate-fadeIn pb-24">
+            <div className="bg-slate-800 border border-slate-700 rounded-3xl p-8 sm:p-10 shadow-2xl relative overflow-hidden text-center mb-8">
               {percentage === 100 && <div className="absolute top-0 left-0 w-full h-full bg-yellow-500/10 animate-pulse pointer-events-none"></div>}
               <div className={`text-6xl sm:text-7xl mb-6 ${color}`}><i className="fa-solid fa-award"></i></div>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-2">{resultTitle}</h2>
               <p className="text-sm sm:text-base text-slate-400 mb-10">{categoryInfo.name} テスト結果</p>
-              
               <div className="flex flex-wrap justify-center items-center gap-4 mb-8">
                 <div className="bg-slate-900 rounded-2xl p-6 border border-slate-700 min-w-[120px] sm:min-w-[140px] flex-1 sm:flex-none">
                   <p className="text-xs sm:text-sm text-slate-400 mb-1">正解数</p>
@@ -346,10 +354,8 @@
                   <p className={`text-3xl sm:text-4xl font-bold ${color}`}>{percentage}<span className="text-base sm:text-xl">%</span></p>
                 </div>
               </div>
-              
               <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-10 max-w-md mx-auto">{resultDesc}</p>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button onClick={() => startQuiz(activeCategory)} className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold transition text-sm sm:text-base">
                   <i className="fa-solid fa-rotate-right"></i> 同じカテゴリにもう一度挑戦
                 </button>
@@ -357,30 +363,38 @@
                   <i className="fa-solid fa-house"></i> トップに戻る
                 </button>
               </div>
-
-              {/* 間違えた問題の復習エリア */}
-              {wrongQuestions.length > 0 && (
-                <div className="text-left bg-slate-900/50 border border-slate-700 rounded-2xl p-6 sm:p-8 mt-8">
-                  <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2 border-b border-slate-700 pb-4">
-                    <i className="fa-solid fa-book text-amber-400"></i> 間違えた問題の復習
-                  </h3>
-                  <div className="space-y-6">
-                    {wrongQuestions.map((q, i) => (
-                      <div key={i} className="bg-slate-800 rounded-xl p-5 border border-slate-600">
-                        <p className="text-white font-bold mb-4 leading-relaxed"><span className="text-slate-400 mr-2">Q.</span>{q.question}</p>
-                        <div className="bg-emerald-900/20 border border-emerald-900/50 rounded-lg p-3 mb-4">
-                          <span className="text-emerald-400 font-bold text-sm mr-2">正解:</span>
-                          <span className="text-slate-200 text-sm">{q.options[q.answer]}</span>
-                        </div>
-                        <p className="text-slate-300 text-sm leading-relaxed">
-                          <span className="font-bold text-blue-400 mr-2">解説:</span>{q.explanation}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
+
+            {wrongAnswers.length > 0 && (
+              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 sm:p-8 shadow-xl">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2 border-b border-slate-700 pb-4">
+                  <i className="fa-solid fa-book-medical text-amber-400"></i> 間違えた問題の復習 ({wrongAnswers.length}問)
+                </h3>
+                <div className="space-y-6">
+                  {wrongAnswers.map((item, idx) => (
+                    <div key={idx} className="bg-slate-900 p-5 rounded-xl border border-slate-700">
+                      <p className="font-bold text-slate-200 mb-4 leading-relaxed">Q. {item.question}</p>
+                      
+                      <div className="grid sm:grid-cols-2 gap-4 mb-4 text-sm">
+                        <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
+                          <span className="block text-red-400 font-bold mb-1"><i className="fa-solid fa-xmark"></i> あなたの回答</span>
+                          <span className="text-slate-300">{item.wrongOption}</span>
+                        </div>
+                        <div className="bg-emerald-900/20 border border-emerald-500/30 p-3 rounded-lg">
+                          <span className="block text-emerald-400 font-bold mb-1"><i className="fa-solid fa-check"></i> 正解</span>
+                          <span className="text-slate-300">{item.correctOption}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-500/30">
+                        <p className="text-blue-300 font-bold mb-1 text-sm"><i className="fa-solid fa-lightbulb"></i> 解説</p>
+                        <p className="text-slate-300 text-sm leading-relaxed">{item.explanation}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
       };
