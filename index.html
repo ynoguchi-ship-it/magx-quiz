@@ -13,7 +13,9 @@
 
   <style>
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes popIn { 0% { opacity: 0; transform: scale(0.8); } 70% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
     .animate-fadeIn { animation: fadeIn 0.4s ease-out forwards; }
+    .animate-popIn { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans selection:bg-blue-500/30 min-h-screen">
@@ -22,7 +24,61 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    const apiKey = "";
+
+    const fetchGeminiExplanation = async (question, wrongOption, correctOption, explanation) => {
+      const prompt = `あなたは製造業の新人教育を担当する優しいベテラン社員です。
+新人が以下のクイズを間違えました。
+
+【問題】${question}
+【新人の回答(不正解)】${wrongOption}
+【正解】${correctOption}
+【元の解説】${explanation}
+
+新人がなぜ間違えやすいのか（よくある誤解）、そして正解を現場の具体的なシチュエーションに例えて分かりやすく教えてください。
+回答は簡潔に、親しみやすい言葉遣いでお願いします。`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        systemInstruction: { parts: [{ text: "あなたは製造業の優しいベテラン社員です。" }] }
+      };
+
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      const retries = [1000, 2000, 4000, 8000, 16000];
+
+      for (let i = 0; i < retries.length + 1; i++) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          return data.candidates?.[0]?.content?.parts?.[0]?.text || "解説の生成に失敗しました。";
+        } catch (error) {
+          if (i < retries.length) {
+            await delay(retries[i]);
+          } else {
+            return "通信エラーが発生しました。しばらく経ってから再度お試しください。";
+          }
+        }
+      }
+    };
+
     const QUIZ_CATEGORIES = [
+      {
+        id: 'comprehensive', name: '総合テスト（卒業試験）',
+        icon: <i className="fa-solid fa-crown text-4xl text-yellow-400"></i>,
+        theme: { borderHover: 'hover:border-yellow-500', shadowHover: 'hover:shadow-yellow-900/40', bgLight: 'bg-yellow-500/10', borderGroupHover: 'group-hover:border-yellow-500/50', text: 'text-yellow-400', bgBtn: 'bg-yellow-600', bgBtnHover: 'hover:bg-yellow-500', bgProgress: 'bg-yellow-500' },
+        description: '全カテゴリからランダムに20問を出題します。現場で活躍するための総合力が試される卒業試験です！',
+        isSpecial: true
+      },
       {
         id: '5s', name: '5S・現場改善',
         icon: <i className="fa-solid fa-clipboard-list text-3xl text-blue-400"></i>,
@@ -162,7 +218,74 @@
       return newArray;
     };
 
-    const QUESTIONS_PER_PLAY = 10;
+    // ランダム出題の基本問題数
+    const NORMAL_QUESTIONS_COUNT = 10;
+    // 総合テストの問題数
+    const COMPREHENSIVE_QUESTIONS_COUNT = 20;
+
+    // --- ランク判定関数 ---
+    const getRankInfo = (percent) => {
+      if (percent === 100) return { rank: 'SS', title: '生産部マイスター', icon: 'fa-crown', color: 'text-yellow-400', bg: 'bg-yellow-500/20', border: 'border-yellow-500/50' };
+      if (percent >= 80)  return { rank: 'S', title: '現場の即戦力', icon: 'fa-medal', color: 'text-emerald-400', bg: 'bg-emerald-500/20', border: 'border-emerald-500/50' };
+      if (percent >= 60)  return { rank: 'A', title: '期待のホープ', icon: 'fa-thumbs-up', color: 'text-blue-400', bg: 'bg-blue-500/20', border: 'border-blue-500/50' };
+      if (percent >= 40)  return { rank: 'B', title: '現場デビュー', icon: 'fa-walking', color: 'text-amber-400', bg: 'bg-amber-500/20', border: 'border-amber-500/50' };
+      return { rank: 'C', title: 'プラマグ見習い', icon: 'fa-seedling', color: 'text-slate-400', bg: 'bg-slate-500/20', border: 'border-slate-500/50' };
+    };
+
+    const WrongAnswerItem = ({ item }) => {
+      const [aiExplanation, setAiExplanation] = useState(null);
+      const [isLoading, setIsLoading] = useState(false);
+
+      const handleAskAI = async () => {
+        setIsLoading(true);
+        const result = await fetchGeminiExplanation(item.question, item.wrongOption, item.correctOption, item.explanation);
+        setAiExplanation(result);
+        setIsLoading(false);
+      };
+
+      return (
+        <div className="bg-slate-900 p-5 rounded-xl border border-slate-700">
+          <p className="font-bold text-slate-200 mb-4 leading-relaxed">Q. {item.question}</p>
+          <div className="grid sm:grid-cols-2 gap-4 mb-4 text-sm">
+            <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
+              <span className="block text-red-400 font-bold mb-1"><i className="fa-solid fa-xmark"></i> あなたの回答</span>
+              <span className="text-slate-300">{item.wrongOption}</span>
+            </div>
+            <div className="bg-emerald-900/20 border border-emerald-500/30 p-3 rounded-lg">
+              <span className="block text-emerald-400 font-bold mb-1"><i className="fa-solid fa-check"></i> 正解</span>
+              <span className="text-slate-300">{item.correctOption}</span>
+            </div>
+          </div>
+          <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-500/30 mb-4">
+            <p className="text-blue-300 font-bold mb-1 text-sm"><i className="fa-solid fa-lightbulb"></i> 解説</p>
+            <p className="text-slate-300 text-sm leading-relaxed">{item.explanation}</p>
+          </div>
+          
+          {!aiExplanation && !isLoading && (
+            <button onClick={handleAskAI} className="w-full py-2.5 bg-purple-900/40 hover:bg-purple-800/60 border border-purple-500/40 text-purple-300 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2">
+              ✨ ベテランAI社員にもっと詳しく聞く
+            </button>
+          )}
+          
+          {isLoading && (
+            <div className="w-full py-4 flex items-center justify-center gap-2 text-purple-400 text-sm font-bold">
+              <i className="fa-solid fa-circle-notch fa-spin text-lg"></i> ベテランAI社員が解説を考えています...
+            </div>
+          )}
+          
+          {aiExplanation && (
+            <div className="bg-purple-900/20 p-4 rounded-lg border border-purple-500/40 animate-fadeIn mt-4">
+              <p className="text-purple-300 font-bold mb-3 text-sm flex items-center gap-2">
+                <i className="fa-solid fa-robot text-lg"></i> ✨ ベテランAI社員の解説
+              </p>
+              <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+                {aiExplanation}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
 
     const App = () => {
       const [view, setView] = useState('title');
@@ -176,7 +299,7 @@
       const [wrongAnswers, setWrongAnswers] = useState([]);
       const [savedScores, setSavedScores] = useState(() => {
         try {
-          const item = window.localStorage.getItem('maguex_quiz_scores');
+          const item = window.localStorage.getItem('maguex_quiz_scores_v2'); // IDを変更してスコアリセット
           return item ? JSON.parse(item) : {};
         } catch (error) {
           console.error(error);
@@ -188,7 +311,7 @@
         try {
           const updatedScores = { ...savedScores, [categoryId]: newScore };
           setSavedScores(updatedScores);
-          window.localStorage.setItem('maguex_quiz_scores', JSON.stringify(updatedScores));
+          window.localStorage.setItem('maguex_quiz_scores_v2', JSON.stringify(updatedScores));
         } catch (error) {
           console.error("保存に失敗しました", error);
         }
@@ -196,9 +319,18 @@
 
       const startQuiz = (categoryId) => {
         setActiveCategory(categoryId);
-        const shuffledQuestions = shuffleArray(QUIZ_QUESTIONS[categoryId]).slice(0, QUESTIONS_PER_PLAY);
+        let shuffledQuestions = [];
+
+        if (categoryId === 'comprehensive') {
+          // 総合テスト：全カテゴリの問題を結合してシャッフルし、20問抽出
+          const allQuestions = Object.values(QUIZ_QUESTIONS).flat();
+          shuffledQuestions = shuffleArray(allQuestions).slice(0, COMPREHENSIVE_QUESTIONS_COUNT);
+        } else {
+          // 通常テスト：選択されたカテゴリをシャッフルし、10問抽出
+          shuffledQuestions = shuffleArray(QUIZ_QUESTIONS[categoryId]).slice(0, NORMAL_QUESTIONS_COUNT);
+        }
+
         setCurrentQuizList(shuffledQuestions);
-        
         setCurrentQuestionIndex(0);
         setScore(0);
         setSelectedOption(null);
@@ -241,57 +373,89 @@
           setIsAnswered(false);
           window.scrollTo(0,0);
         } else {
-          saveScoreToLocal(activeCategory, score + (selectedOption === currentQuizList[currentQuestionIndex].answer ? 1 : 0));
+          saveScoreToLocal(activeCategory, score);
           setView('result');
           window.scrollTo(0,0);
         }
       };
 
-      const TitleScreen = () => (
-        <div className="max-w-5xl mx-auto py-12 px-4 animate-fadeIn">
-          <div className="text-center mb-12 sm:mb-16">
-            <div className="inline-flex items-center justify-center p-4 sm:p-5 bg-blue-600 rounded-2xl mb-4 sm:mb-6 shadow-lg shadow-blue-900/50">
-              <i className="fa-solid fa-book-open text-3xl sm:text-4xl text-white"></i>
+      const TitleScreen = () => {
+        const specialCategory = QUIZ_CATEGORIES.find(c => c.isSpecial);
+        const normalCategories = QUIZ_CATEGORIES.filter(c => !c.isSpecial);
+
+        return (
+          <div className="max-w-5xl mx-auto py-12 px-4 animate-fadeIn">
+            <div className="text-center mb-10 sm:mb-14">
+              <div className="inline-flex items-center justify-center p-4 sm:p-5 bg-blue-600 rounded-2xl mb-4 sm:mb-6 shadow-lg shadow-blue-900/50">
+                <i className="fa-solid fa-book-open text-3xl sm:text-4xl text-white"></i>
+              </div>
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight leading-snug">
+                <span className="text-blue-400 block mb-1 text-xl sm:text-2xl md:text-3xl">マグエックス</span>
+                生産部基礎知識クイズ
+              </h1>
+              <p className="text-sm sm:text-base md:text-lg text-slate-400 mt-6">
+                現場で必須となる基礎知識をテストします。<br className="hidden md:block" />
+                満点を目指して<span className="text-yellow-400 font-bold">「生産部マイスター」</span>の称号を手に入れよう！
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white mb-4 tracking-tight leading-snug">
-              <span className="text-blue-400 block mb-1 text-xl sm:text-2xl md:text-3xl">マグエックス</span>
-              生産部基礎知識クイズ
-            </h1>
-            <p className="text-sm sm:text-base md:text-lg text-slate-400 mt-6">
-              現場で必須となる基礎知識をカテゴリ別にテストします。<br className="hidden md:block" />
-              カテゴリを選ぶと、毎回<span className="text-yellow-400 font-bold">ランダムに10問</span>が出題されます。
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {QUIZ_CATEGORIES.map((category) => {
-              const previousScore = savedScores[category.id];
-              return (
-                <button key={category.id} onClick={() => startQuiz(category.id)} className={`bg-slate-800 border-2 border-slate-700 ${category.theme.borderHover} rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${category.theme.shadowHover} group relative overflow-hidden flex flex-col justify-between h-full`}>
-                  <div>
-                    <div className={`absolute top-0 right-0 w-32 h-32 ${category.theme.bgLight} rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110`}></div>
-                    <div className="relative z-10">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className={`w-14 h-14 bg-slate-900 rounded-xl flex items-center justify-center border border-slate-700 ${category.theme.borderGroupHover} transition-colors`}>{category.icon}</div>
-                        {previousScore !== undefined && (
-                          <div className="bg-slate-900 px-3 py-1 rounded-full border border-slate-700 text-xs font-semibold">
-                            <span className="text-slate-400">前回: </span>
-                            <span className={previousScore >= 8 ? "text-emerald-400" : "text-amber-400"}>{previousScore} / 10問</span>
-                          </div>
-                        )}
+
+            {/* 総合テスト（特別枠） */}
+            <div className="mb-8">
+              <button onClick={() => startQuiz(specialCategory.id)} className={`w-full bg-slate-800 border-2 border-yellow-500/50 hover:border-yellow-400 rounded-2xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-yellow-900/40 group relative overflow-hidden flex flex-col sm:flex-row items-center gap-6`}>
+                <div className={`absolute top-0 right-0 w-48 h-48 bg-yellow-500/10 rounded-bl-full -mr-16 -mt-16 transition-transform group-hover:scale-110`}></div>
+                <div className="relative z-10 w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center border border-yellow-500/30 flex-shrink-0 group-hover:border-yellow-400 transition-colors shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+                  {specialCategory.icon}
+                </div>
+                <div className="relative z-10 flex-1 text-center sm:text-left">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 gap-2">
+                    <h2 className="text-2xl sm:text-3xl font-bold text-white">{specialCategory.name}</h2>
+                    {savedScores[specialCategory.id] !== undefined && (
+                      <div className="bg-slate-900 px-4 py-1.5 rounded-full border border-yellow-500/30 text-sm font-semibold inline-block mx-auto sm:mx-0">
+                        <span className="text-slate-400">前回: </span>
+                        <span className={savedScores[specialCategory.id] >= 16 ? "text-yellow-400" : "text-amber-400"}>{savedScores[specialCategory.id]} / {COMPREHENSIVE_QUESTIONS_COUNT}問</span>
                       </div>
-                      <h2 className="text-xl font-bold text-white mb-2">{category.name}</h2>
-                      <p className="text-sm text-slate-400 leading-relaxed mb-6">{category.description}</p>
+                    )}
+                  </div>
+                  <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-4">{specialCategory.description}</p>
+                  <div className={`inline-flex items-center text-yellow-400 font-bold text-base bg-yellow-500/10 px-4 py-2 rounded-lg`}>
+                    全20問のテストを開始する <i className="fa-solid fa-chevron-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* 通常カテゴリ（グリッド） */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+              {normalCategories.map((category) => {
+                const previousScore = savedScores[category.id];
+                return (
+                  <button key={category.id} onClick={() => startQuiz(category.id)} className={`bg-slate-800 border-2 border-slate-700 ${category.theme.borderHover} rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${category.theme.shadowHover} group relative overflow-hidden flex flex-col justify-between h-full`}>
+                    <div>
+                      <div className={`absolute top-0 right-0 w-32 h-32 ${category.theme.bgLight} rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110`}></div>
+                      <div className="relative z-10">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className={`w-14 h-14 bg-slate-900 rounded-xl flex items-center justify-center border border-slate-700 ${category.theme.borderGroupHover} transition-colors`}>{category.icon}</div>
+                          {previousScore !== undefined && (
+                            <div className="bg-slate-900 px-3 py-1 rounded-full border border-slate-700 text-xs font-semibold">
+                              <span className="text-slate-400">前回: </span>
+                              <span className={previousScore >= 8 ? "text-emerald-400" : "text-amber-400"}>{previousScore} / {NORMAL_QUESTIONS_COUNT}問</span>
+                            </div>
+                          )}
+                        </div>
+                        <h2 className="text-xl font-bold text-white mb-2">{category.name}</h2>
+                        <p className="text-sm text-slate-400 leading-relaxed mb-6">{category.description}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className={`relative z-10 flex items-center ${category.theme.text} font-semibold text-sm mt-auto`}>
-                    クイズを開始 <i className="fa-solid fa-chevron-right ml-1 group-hover:translate-x-1 transition-transform"></i>
-                  </div>
-                </button>
-              );
-            })}
+                    <div className={`relative z-10 flex items-center ${category.theme.text} font-semibold text-sm mt-auto`}>
+                      10問テストを開始 <i className="fa-solid fa-chevron-right ml-1 group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      );
+        );
+      };
 
       const QuizScreen = () => {
         const categoryInfo = QUIZ_CATEGORIES.find(c => c.id === activeCategory);
@@ -355,18 +519,26 @@
       const ResultScreen = () => {
         const categoryInfo = QUIZ_CATEGORIES.find(c => c.id === activeCategory);
         const percentage = Math.round((score / currentQuizList.length) * 100);
-        let resultTitle, resultDesc, color;
-        if (percentage === 100) { resultTitle = "パーフェクト！"; resultDesc = "素晴らしい成績です！知識は完璧に身についています。"; color = "text-yellow-400"; }
-        else if (percentage >= 80) { resultTitle = "合格レベル！"; resultDesc = "基礎は身についています。間違えた箇所を復習しましょう。"; color = "text-emerald-400"; }
-        else { resultTitle = "もう少しがんばりましょう"; resultDesc = "間違えた箇所をしっかり復習して、基礎を固めることをおすすめします。"; color = "text-amber-400"; }
+        
+        // 新ランクシステム
+        const rankInfo = getRankInfo(percentage);
 
         return (
           <div className="max-w-3xl mx-auto py-12 px-4 animate-fadeIn pb-24">
             <div className="bg-slate-800 border border-slate-700 rounded-3xl p-8 sm:p-10 shadow-2xl relative overflow-hidden text-center mb-8">
               {percentage === 100 && <div className="absolute top-0 left-0 w-full h-full bg-yellow-500/10 animate-pulse pointer-events-none"></div>}
-              <div className={`text-6xl sm:text-7xl mb-6 ${color}`}><i className="fa-solid fa-award"></i></div>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-2">{resultTitle}</h2>
-              <p className="text-sm sm:text-base text-slate-400 mb-10">{categoryInfo.name} テスト結果</p>
+              
+              <div className="mb-2">
+                <span className={`inline-block px-4 py-1 rounded-full text-sm font-bold border ${rankInfo.border} ${rankInfo.bg} ${rankInfo.color} mb-4`}>
+                  ランク {rankInfo.rank}
+                </span>
+              </div>
+              <div className={`text-6xl sm:text-7xl mb-6 ${rankInfo.color} animate-popIn`} style={{ textShadow: percentage === 100 ? '0 0 20px rgba(250,204,21,0.5)' : 'none' }}>
+                <i className={`fa-solid ${rankInfo.icon}`}></i>
+              </div>
+              <p className="text-sm text-slate-400 mb-1">獲得称号</p>
+              <h2 className={`text-3xl sm:text-4xl font-extrabold mb-8 ${rankInfo.color}`}>{rankInfo.title}</h2>
+              
               <div className="flex flex-wrap justify-center items-center gap-4 mb-8">
                 <div className="bg-slate-900 rounded-2xl p-6 border border-slate-700 min-w-[120px] sm:min-w-[140px] flex-1 sm:flex-none">
                   <p className="text-xs sm:text-sm text-slate-400 mb-1">正解数</p>
@@ -374,13 +546,19 @@
                 </div>
                 <div className="bg-slate-900 rounded-2xl p-6 border border-slate-700 min-w-[120px] sm:min-w-[140px] flex-1 sm:flex-none">
                   <p className="text-xs sm:text-sm text-slate-400 mb-1">正答率</p>
-                  <p className={`text-3xl sm:text-4xl font-bold ${color}`}>{percentage}<span className="text-base sm:text-xl">%</span></p>
+                  <p className={`text-3xl sm:text-4xl font-bold ${rankInfo.color}`}>{percentage}<span className="text-base sm:text-xl">%</span></p>
                 </div>
               </div>
-              <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-10 max-w-md mx-auto">{resultDesc}</p>
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-10 max-w-md mx-auto">
+                {percentage === 100 ? "完璧な成績です！この知識を現場で存分に活かしてください。" :
+                 percentage >= 80 ? "素晴らしい成績です！間違えた箇所を復習し、完全マスターを目指しましょう。" :
+                 percentage >= 60 ? "基礎はできています。解説を読んで、さらに知識を深めましょう。" :
+                 "まずは基礎固めからです！もう一度チャレンジして用語に慣れていきましょう。"}
+              </p>
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button onClick={() => startQuiz(activeCategory)} className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold transition text-sm sm:text-base">
-                  <i className="fa-solid fa-rotate-right"></i> 同じカテゴリにもう一度挑戦
+                  <i className="fa-solid fa-rotate-right"></i> 同じテストをやり直す
                 </button>
                 <button onClick={goHome} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold transition shadow-lg shadow-blue-900/50 text-sm sm:text-base">
                   <i className="fa-solid fa-house"></i> トップに戻る
@@ -395,23 +573,7 @@
                 </h3>
                 <div className="space-y-6">
                   {wrongAnswers.map((item, idx) => (
-                    <div key={idx} className="bg-slate-900 p-5 rounded-xl border border-slate-700">
-                      <p className="font-bold text-slate-200 mb-4 leading-relaxed">Q. {item.question}</p>
-                      <div className="grid sm:grid-cols-2 gap-4 mb-4 text-sm">
-                        <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
-                          <span className="block text-red-400 font-bold mb-1"><i className="fa-solid fa-xmark"></i> あなたの回答</span>
-                          <span className="text-slate-300">{item.wrongOption}</span>
-                        </div>
-                        <div className="bg-emerald-900/20 border border-emerald-500/30 p-3 rounded-lg">
-                          <span className="block text-emerald-400 font-bold mb-1"><i className="fa-solid fa-check"></i> 正解</span>
-                          <span className="text-slate-300">{item.correctOption}</span>
-                        </div>
-                      </div>
-                      <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-500/30">
-                        <p className="text-blue-300 font-bold mb-1 text-sm"><i className="fa-solid fa-lightbulb"></i> 解説</p>
-                        <p className="text-slate-300 text-sm leading-relaxed">{item.explanation}</p>
-                      </div>
-                    </div>
+                    <WrongAnswerItem key={idx} item={item} />
                   ))}
                 </div>
               </div>
