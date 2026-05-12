@@ -25,98 +25,7 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    // スプレッドシート連携用URL（空欄の場合は内蔵データを使用）
     const SPREADSHEET_CSV_URL = ""; 
-
-    const apiKey = "AIzaSyDm5Pc2Ajt-PVUSrRpP4_qwUcTqF0saTkw";
-
-    const fetchGeminiExplanation = async (question, wrongOption, correctOption, explanation) => {
-      const prompt = `あなたは製造業の新人教育を担当する優しいベテラン社員です。
-新人が以下のクイズを間違えました。
-
-【問題】${question}
-【新人の回答(不正解)】${wrongOption}
-【正解】${correctOption}
-【元の解説】${explanation}
-
-新人がなぜ間違えやすいのか（よくある誤解）、そして正解を現場の具体的なシチュエーションに例えて分かりやすく教えてください。
-回答は簡潔に、親しみやすい言葉遣いでお願いします。`;
-
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-      const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        systemInstruction: { parts: [{ text: "あなたは製造業の優しいベテラン社員です。" }] }
-      };
-
-      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-      const retries = [1000, 2000, 4000, 8000, 16000];
-
-      for (let i = 0; i < retries.length + 1; i++) {
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          return data.candidates?.[0]?.content?.parts?.[0]?.text || "解説の生成に失敗しました。";
-        } catch (error) {
-          if (i < retries.length) {
-            await delay(retries[i]);
-          } else {
-            return "通信エラーが発生しました。しばらく経ってから再度お試しください。";
-          }
-        }
-      }
-    };
-
-    const fetchGeminiAdvice = async (categoryName, score, total, wrongAnswers) => {
-      const wrongListStr = wrongAnswers.length > 0 ? wrongAnswers.map(w => `・${w.question}`).join('\n') : 'なし';
-      const prompt = `あなたは製造業の新人教育を担当する優しいベテラン社員です。
-新人が「${categoryName}」のクイズに挑戦しました。
-結果は ${total}問中 ${score}問正解 でした。
-
-${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです：\n${wrongListStr}\n` : "全問正解でした！素晴らしいです！\n"}
-この結果を踏まえて、新人への労いの言葉と、明日からの現場で活かせる実践的で具体的なアドバイスを200文字程度で優しく伝えてください。
-回答は親しみやすい言葉遣いでお願いします。`;
-
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-      const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        systemInstruction: { parts: [{ text: "あなたは製造業の優しいベテラン社員です。" }] }
-      };
-
-      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-      const retries = [1000, 2000, 4000, 8000, 16000];
-
-      for (let i = 0; i < retries.length + 1; i++) {
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          return data.candidates?.[0]?.content?.parts?.[0]?.text || "アドバイスの生成に失敗しました。";
-        } catch (error) {
-          if (i < retries.length) {
-            await delay(retries[i]);
-          } else {
-            return "通信エラーが発生しました。しばらく経ってから再度お試しください。";
-          }
-        }
-      }
-    };
 
     const QUIZ_CATEGORIES = [
       {
@@ -158,7 +67,6 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
       }
     ];
 
-    // 大幅増量したデフォルト（内蔵）クイズデータ
     const DEFAULT_QUIZ_QUESTIONS = {
       '5s': [
         { question: "5S活動における「整理」の正しい意味はどれですか？", options: ["必要なものと不要なものを分け、不要なものを捨てること", "必要なものをいつでもすぐに取り出せるように配置すること", "ゴミや汚れをなくし、綺麗な状態を保つこと", "決められたルールを正しく守る習慣をつけること"], answer: 0, explanation: "「整理」は要るものと要らないものを区別し、要らないものを捨てることです。選択肢2は「整頓」、3は「清掃」、4は「しつけ」です。" },
@@ -290,73 +198,15 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
       return newArray;
     };
 
-    // ランダム出題の基本問題数
     const NORMAL_QUESTIONS_COUNT = 10;
-    // 総合テストの問題数
     const COMPREHENSIVE_QUESTIONS_COUNT = 20;
 
-    // --- ランク判定関数 ---
     const getRankInfo = (percent) => {
       if (percent === 100) return { rank: 'SS', title: '生産部マイスター', icon: 'fa-crown', color: 'text-yellow-400', bg: 'bg-yellow-500/20', border: 'border-yellow-500/50' };
       if (percent >= 80)  return { rank: 'S', title: '現場の即戦力', icon: 'fa-medal', color: 'text-emerald-400', bg: 'bg-emerald-500/20', border: 'border-emerald-500/50' };
       if (percent >= 60)  return { rank: 'A', title: '期待のホープ', icon: 'fa-thumbs-up', color: 'text-blue-400', bg: 'bg-blue-500/20', border: 'border-blue-500/50' };
       if (percent >= 40)  return { rank: 'B', title: '現場デビュー', icon: 'fa-walking', color: 'text-amber-400', bg: 'bg-amber-500/20', border: 'border-amber-500/50' };
       return { rank: 'C', title: 'プラマグ見習い', icon: 'fa-seedling', color: 'text-slate-400', bg: 'bg-slate-500/20', border: 'border-slate-500/50' };
-    };
-
-    const WrongAnswerItem = ({ item }) => {
-      const [aiExplanation, setAiExplanation] = useState(null);
-      const [isLoading, setIsLoading] = useState(false);
-
-      const handleAskAI = async () => {
-        setIsLoading(true);
-        const result = await fetchGeminiExplanation(item.question, item.wrongOption, item.correctOption, item.explanation);
-        setAiExplanation(result);
-        setIsLoading(false);
-      };
-
-      return (
-        <div className="bg-slate-900 p-5 rounded-xl border border-slate-700">
-          <p className="font-bold text-slate-200 mb-4 leading-relaxed">Q. {item.question}</p>
-          <div className="grid sm:grid-cols-2 gap-4 mb-4 text-sm">
-            <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
-              <span className="block text-red-400 font-bold mb-1"><i className="fa-solid fa-xmark"></i> あなたの回答</span>
-              <span className="text-slate-300">{item.wrongOption}</span>
-            </div>
-            <div className="bg-emerald-900/20 border border-emerald-500/30 p-3 rounded-lg">
-              <span className="block text-emerald-400 font-bold mb-1"><i className="fa-solid fa-check"></i> 正解</span>
-              <span className="text-slate-300">{item.correctOption}</span>
-            </div>
-          </div>
-          <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-500/30 mb-4">
-            <p className="text-blue-300 font-bold mb-1 text-sm"><i className="fa-solid fa-lightbulb"></i> 解説</p>
-            <p className="text-slate-300 text-sm leading-relaxed">{item.explanation}</p>
-          </div>
-          
-          {!aiExplanation && !isLoading && (
-            <button onClick={handleAskAI} className="w-full py-2.5 bg-purple-900/40 hover:bg-purple-800/60 border border-purple-500/40 text-purple-300 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2">
-              ✨ ベテランAI社員にもっと詳しく聞く
-            </button>
-          )}
-          
-          {isLoading && (
-            <div className="w-full py-4 flex items-center justify-center gap-2 text-purple-400 text-sm font-bold">
-              <i className="fa-solid fa-circle-notch fa-spin text-lg"></i> ベテランAI社員が解説を考えています...
-            </div>
-          )}
-          
-          {aiExplanation && (
-            <div className="bg-purple-900/20 p-4 rounded-lg border border-purple-500/40 animate-fadeIn mt-4">
-              <p className="text-purple-300 font-bold mb-3 text-sm flex items-center gap-2">
-                <i className="fa-solid fa-robot text-lg"></i> ✨ ベテランAI社員の解説
-              </p>
-              <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
-                {aiExplanation}
-              </div>
-            </div>
-          )}
-        </div>
-      );
     };
 
     const App = () => {
@@ -370,13 +220,12 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
       
       const [wrongAnswers, setWrongAnswers] = useState([]);
       
-      // クイズデータとローディング状態
       const [quizData, setQuizData] = useState(DEFAULT_QUIZ_QUESTIONS);
       const [isLoadingData, setIsLoadingData] = useState(false);
 
       const [savedScores, setSavedScores] = useState(() => {
         try {
-          const item = window.localStorage.getItem('maguex_quiz_scores_v3'); 
+          const item = window.localStorage.getItem('maguex_quiz_scores_v4'); 
           return item ? JSON.parse(item) : {};
         } catch (error) {
           console.error(error);
@@ -384,7 +233,6 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
         }
       });
 
-      // --- スプレッドシート読み込み処理 ---
       useEffect(() => {
         if (SPREADSHEET_CSV_URL && SPREADSHEET_CSV_URL.trim() !== "") {
           setIsLoadingData(true);
@@ -428,7 +276,7 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
         try {
           const updatedScores = { ...savedScores, [categoryId]: newScore };
           setSavedScores(updatedScores);
-          window.localStorage.setItem('maguex_quiz_scores_v3', JSON.stringify(updatedScores));
+          window.localStorage.setItem('maguex_quiz_scores_v4', JSON.stringify(updatedScores));
         } catch (error) {
           console.error("保存に失敗しました", error);
         }
@@ -450,7 +298,6 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
            return;
         }
 
-        // 選択肢をランダムにシャッフルし、正解のインデックスを再計算する
         const randomizedQuestions = shuffledQuestions.map(q => {
           const correctText = q.options[q.answer];
           const newOptions = shuffleArray([...q.options]);
@@ -505,8 +352,7 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
           setIsAnswered(false);
           window.scrollTo(0,0);
         } else {
-          // ★修正：スコアはすでに加算されているため、そのまま保存します
-          saveScoreToLocal(activeCategory, score);
+          saveScoreToLocal(activeCategory, score + (selectedOption === currentQuizList[currentQuestionIndex].answer ? 1 : 0));
           setView('result');
           window.scrollTo(0,0);
         }
@@ -539,7 +385,6 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
               </div>
             ) : (
               <>
-                {/* 総合テスト（特別枠） */}
                 <div className="mb-8">
                   <button onClick={() => startQuiz(specialCategory.id)} className={`w-full bg-slate-800 border-2 border-yellow-500/50 hover:border-yellow-400 rounded-2xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-yellow-900/40 group relative overflow-hidden flex flex-col sm:flex-row items-center gap-6`}>
                     <div className={`absolute top-0 right-0 w-48 h-48 bg-yellow-500/10 rounded-bl-full -mr-16 -mt-16 transition-transform group-hover:scale-110`}></div>
@@ -564,7 +409,6 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
                   </button>
                 </div>
 
-                {/* 通常カテゴリ（グリッド） */}
                 <div className="grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
                   {normalCategories.map((category) => {
                     const previousScore = savedScores[category.id];
@@ -664,8 +508,6 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
 
       const ResultScreen = () => {
         const [isCopied, setIsCopied] = useState(false);
-        const [aiAdvice, setAiAdvice] = useState(null);
-        const [isFetchingAdvice, setIsFetchingAdvice] = useState(false);
         const categoryInfo = QUIZ_CATEGORIES.find(c => c.id === activeCategory);
         const percentage = Math.round((score / currentQuizList.length) * 100);
         
@@ -686,13 +528,6 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
             console.error('コピーに失敗しました', err);
           }
           document.body.removeChild(textArea);
-        };
-
-        const handleGetAdvice = async () => {
-          setIsFetchingAdvice(true);
-          const advice = await fetchGeminiAdvice(categoryInfo.name, score, currentQuizList.length, wrongAnswers);
-          setAiAdvice(advice);
-          setIsFetchingAdvice(false);
         };
 
         return (
@@ -721,37 +556,12 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
                   <p className={`text-3xl sm:text-4xl font-bold ${rankInfo.color}`}>{percentage}<span className="text-base sm:text-xl">%</span></p>
                 </div>
               </div>
-
-              {/* AIアドバイスセクション */}
-              <div className="mb-10 text-left">
-                {!aiAdvice && !isFetchingAdvice && (
-                  <button 
-                    onClick={handleGetAdvice} 
-                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-bold transition flex items-center justify-center gap-3 shadow-lg shadow-purple-900/50"
-                  >
-                    <i className="fa-solid fa-wand-magic-sparkles text-xl"></i> ✨ テスト結果からAI先輩の総評をもらう
-                  </button>
-                )}
-                
-                {isFetchingAdvice && (
-                  <div className="w-full py-6 flex flex-col items-center justify-center gap-3 bg-purple-900/20 border border-purple-500/30 rounded-xl">
-                    <i className="fa-solid fa-circle-notch fa-spin text-3xl text-purple-400"></i>
-                    <p className="text-purple-300 font-bold">AI先輩があなたの結果を分析しています...</p>
-                  </div>
-                )}
-
-                {aiAdvice && (
-                  <div className="bg-gradient-to-br from-slate-800 to-purple-900/40 p-6 sm:p-8 rounded-2xl border border-purple-500/40 animate-fadeIn relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-bl-full -mr-10 -mt-10"></div>
-                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2 relative z-10">
-                      <i className="fa-solid fa-robot text-purple-400"></i> ✨ AI先輩からの総評とアドバイス
-                    </h3>
-                    <div className="text-slate-300 text-base leading-relaxed whitespace-pre-wrap relative z-10">
-                      {aiAdvice}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-10 max-w-md mx-auto">
+                {percentage === 100 ? "完璧な成績です！この知識を現場で存分に活かしてください。" :
+                 percentage >= 80 ? "素晴らしい成績です！間違えた箇所を復習し、完全マスターを目指しましょう。" :
+                 percentage >= 60 ? "基礎はできています。解説を読んで、さらに知識を深めましょう。" :
+                 "まずは基礎固めからです！もう一度チャレンジして用語に慣れていきましょう。"}
+              </p>
 
               <div className="mb-10">
                 <button 
@@ -786,7 +596,23 @@ ${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです
                 </h3>
                 <div className="space-y-6">
                   {wrongAnswers.map((item, idx) => (
-                    <WrongAnswerItem key={idx} item={item} />
+                    <div key={idx} className="bg-slate-900 p-5 rounded-xl border border-slate-700">
+                      <p className="font-bold text-slate-200 mb-4 leading-relaxed">Q. {item.question}</p>
+                      <div className="grid sm:grid-cols-2 gap-4 mb-4 text-sm">
+                        <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
+                          <span className="block text-red-400 font-bold mb-1"><i className="fa-solid fa-xmark"></i> あなたの回答</span>
+                          <span className="text-slate-300">{item.wrongOption}</span>
+                        </div>
+                        <div className="bg-emerald-900/20 border border-emerald-500/30 p-3 rounded-lg">
+                          <span className="block text-emerald-400 font-bold mb-1"><i className="fa-solid fa-check"></i> 正解</span>
+                          <span className="text-slate-300">{item.correctOption}</span>
+                        </div>
+                      </div>
+                      <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-500/30 mb-4">
+                        <p className="text-blue-300 font-bold mb-1 text-sm"><i className="fa-solid fa-lightbulb"></i> 解説</p>
+                        <p className="text-slate-300 text-sm leading-relaxed">{item.explanation}</p>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
