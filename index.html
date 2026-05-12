@@ -75,6 +75,49 @@
       }
     };
 
+    const fetchGeminiAdvice = async (categoryName, score, total, wrongAnswers) => {
+      const wrongListStr = wrongAnswers.length > 0 ? wrongAnswers.map(w => `・${w.question}`).join('\n') : 'なし';
+      const prompt = `あなたは製造業の新人教育を担当する優しいベテラン社員です。
+新人が「${categoryName}」のクイズに挑戦しました。
+結果は ${total}問中 ${score}問正解 でした。
+
+${wrongAnswers.length > 0 ? `新人が間違えた問題は以下の通りです：\n${wrongListStr}\n` : "全問正解でした！素晴らしいです！\n"}
+この結果を踏まえて、新人への労いの言葉と、明日からの現場で活かせる実践的で具体的なアドバイスを200文字程度で優しく伝えてください。
+回答は親しみやすい言葉遣いでお願いします。`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        systemInstruction: { parts: [{ text: "あなたは製造業の優しいベテラン社員です。" }] }
+      };
+
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      const retries = [1000, 2000, 4000, 8000, 16000];
+
+      for (let i = 0; i < retries.length + 1; i++) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          return data.candidates?.[0]?.content?.parts?.[0]?.text || "アドバイスの生成に失敗しました。";
+        } catch (error) {
+          if (i < retries.length) {
+            await delay(retries[i]);
+          } else {
+            return "通信エラーが発生しました。しばらく経ってから再度お試しください。";
+          }
+        }
+      }
+    };
+
     const QUIZ_CATEGORIES = [
       {
         id: 'comprehensive', name: '総合テスト（卒業試験）',
@@ -621,6 +664,8 @@
 
       const ResultScreen = () => {
         const [isCopied, setIsCopied] = useState(false);
+        const [aiAdvice, setAiAdvice] = useState(null);
+        const [isFetchingAdvice, setIsFetchingAdvice] = useState(false);
         const categoryInfo = QUIZ_CATEGORIES.find(c => c.id === activeCategory);
         const percentage = Math.round((score / currentQuizList.length) * 100);
         
@@ -641,6 +686,13 @@
             console.error('コピーに失敗しました', err);
           }
           document.body.removeChild(textArea);
+        };
+
+        const handleGetAdvice = async () => {
+          setIsFetchingAdvice(true);
+          const advice = await fetchGeminiAdvice(categoryInfo.name, score, currentQuizList.length, wrongAnswers);
+          setAiAdvice(advice);
+          setIsFetchingAdvice(false);
         };
 
         return (
@@ -669,12 +721,37 @@
                   <p className={`text-3xl sm:text-4xl font-bold ${rankInfo.color}`}>{percentage}<span className="text-base sm:text-xl">%</span></p>
                 </div>
               </div>
-              <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-10 max-w-md mx-auto">
-                {percentage === 100 ? "完璧な成績です！この知識を現場で存分に活かしてください。" :
-                 percentage >= 80 ? "素晴らしい成績です！間違えた箇所を復習し、完全マスターを目指しましょう。" :
-                 percentage >= 60 ? "基礎はできています。解説を読んで、さらに知識を深めましょう。" :
-                 "まずは基礎固めからです！もう一度チャレンジして用語に慣れていきましょう。"}
-              </p>
+
+              {/* AIアドバイスセクション */}
+              <div className="mb-10 text-left">
+                {!aiAdvice && !isFetchingAdvice && (
+                  <button 
+                    onClick={handleGetAdvice} 
+                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-bold transition flex items-center justify-center gap-3 shadow-lg shadow-purple-900/50"
+                  >
+                    <i className="fa-solid fa-wand-magic-sparkles text-xl"></i> ✨ テスト結果からAI先輩の総評をもらう
+                  </button>
+                )}
+                
+                {isFetchingAdvice && (
+                  <div className="w-full py-6 flex flex-col items-center justify-center gap-3 bg-purple-900/20 border border-purple-500/30 rounded-xl">
+                    <i className="fa-solid fa-circle-notch fa-spin text-3xl text-purple-400"></i>
+                    <p className="text-purple-300 font-bold">AI先輩があなたの結果を分析しています...</p>
+                  </div>
+                )}
+
+                {aiAdvice && (
+                  <div className="bg-gradient-to-br from-slate-800 to-purple-900/40 p-6 sm:p-8 rounded-2xl border border-purple-500/40 animate-fadeIn relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-bl-full -mr-10 -mt-10"></div>
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2 relative z-10">
+                      <i className="fa-solid fa-robot text-purple-400"></i> ✨ AI先輩からの総評とアドバイス
+                    </h3>
+                    <div className="text-slate-300 text-base leading-relaxed whitespace-pre-wrap relative z-10">
+                      {aiAdvice}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="mb-10">
                 <button 
