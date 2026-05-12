@@ -352,7 +352,7 @@
           setIsAnswered(false);
           window.scrollTo(0,0);
         } else {
-          saveScoreToLocal(activeCategory, score + (selectedOption === currentQuizList[currentQuestionIndex].answer ? 1 : 0));
+          saveScoreToLocal(activeCategory, score);
           setView('result');
           window.scrollTo(0,0);
         }
