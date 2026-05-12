@@ -10,6 +10,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
   <style>
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -23,6 +24,9 @@
 
   <script type="text/babel">
     const { useState, useEffect } = React;
+
+    // スプレッドシート連携用URL（空欄の場合は内蔵データを使用）
+    const SPREADSHEET_CSV_URL = ""; 
 
     const apiKey = "";
 
@@ -111,7 +115,8 @@
       }
     ];
 
-    const QUIZ_QUESTIONS = {
+    // 大幅増量したデフォルト（内蔵）クイズデータ
+    const DEFAULT_QUIZ_QUESTIONS = {
       '5s': [
         { question: "5S活動における「整理」の正しい意味はどれですか？", options: ["必要なものと不要なものを分け、不要なものを捨てること", "必要なものをいつでもすぐに取り出せるように配置すること", "ゴミや汚れをなくし、綺麗な状態を保つこと", "決められたルールを正しく守る習慣をつけること"], answer: 0, explanation: "「整理」は要るものと要らないものを区別し、要らないものを捨てることです。選択肢2は「整頓」、3は「清掃」、4は「しつけ」です。" },
         { question: "トヨタ生産方式における「7つのムダ」に含まれないものはどれですか？", options: ["作りすぎのムダ", "在庫のムダ", "休憩のムダ", "動作のムダ"], answer: 2, explanation: "7つのムダは「作りすぎ、手持ち（待ち）、運搬、加工そのもの、在庫、動作、不良を作る」ムダです。適切な休憩はムダではありません。" },
@@ -129,7 +134,12 @@
         { question: "設備のトラブル等で、一時的に設備が停止するが、簡単な処置ですぐに復旧するような短い停止を何と呼ぶ？", options: ["ドカ停", "チョコ停", "計画停止", "アイドリング"], answer: 1, explanation: "数秒から数分程度のわずかな停止を「チョコ停」と呼びます。これが頻発すると大きなロスになるため、原因究明と対策が必要です。" },
         { question: "作業者の疲労を減らし、効率を高めるための「動作経済の原則」に含まれないものは？", options: ["動作の数を減らす", "両手を同時に使う", "動作をできるだけ早く激しく行う", "動作の距離を短くする"], answer: 2, explanation: "動作経済の原則は、無理な動きやムダな動きをなくし、自然で楽な動作で作業できるようにするためのルールです。激しい動作は疲労に繋がります。" },
         { question: "動力（電気など）を使わず、重力やてこの原理などのからくりを利用して作業を改善する取り組みを何と呼ぶ？", options: ["IT化", "ロボット化", "からくり改善", "自動化"], answer: 2, explanation: "高額な設備投資を行わず、現場のアイデアと身の回りのもの（重力、バネ、滑車など）を使ってムダを省く、環境にも優しい改善手法です。" },
-        { question: "ムダ取りの観点で、作業者が次の部品や指示が来るのを待っている状態を何と呼ぶ？", options: ["動作のムダ", "手持ち（待ち）のムダ", "不良のムダ", "加工のムダ"], answer: 1, explanation: "ラインバランスが悪い時や、前工程でトラブルがあった時などに発生する「手待ちのムダ」です。" }
+        { question: "ムダ取りの観点で、作業者が次の部品や指示が来るのを待っている状態を何と呼ぶ？", options: ["動作のムダ", "手持ち（待ち）のムダ", "不良のムダ", "加工のムダ"], answer: 1, explanation: "ラインバランスが悪い時や、前工程でトラブルがあった時などに発生する「手待ちのムダ」です。" },
+        { question: "現場でのコミュニケーション不足が引き起こす問題として、最も不適切なものは？", options: ["連絡漏れによる不良品の発生", "作業の引き継ぎがスムーズにいく", "作業者のモチベーション低下", "ヒヤリハット報告の減少"], answer: 1, explanation: "コミュニケーションが不足すると、次工程への引き継ぎで伝達漏れが起きやすくなり、トラブルの原因となります。" },
+        { question: "改善活動（カイゼン）を提案する際、「現状」をどう捉えるのが良いか？", options: ["現状が最も完璧だと信じる", "現状に問題はないかと常に疑いを持つ", "他人のやり方には口出ししない", "ルール通りにやっていればそれ以上は考えない"], answer: 1, explanation: "「もっと良くならないか？」「もっと楽にならないか？」と常に現状に疑問（問題意識）を持つことが、カイゼンの第一歩です。" },
+        { question: "5Sの「清潔」を維持するための効果的な取り組みはどれか？", options: ["年に1回の大掃除に力を入れる", "整理・整頓・清掃のルール（基準）を決め、それを全員が守れる仕組みを作る", "汚れたらその都度、気づいた人だけが掃除する", "清掃用の道具を工場の端に隠しておく"], answer: 1, explanation: "「清潔」とは、整理・整頓・清掃が維持された状態のことです。個人の意識に頼るのではなく、仕組み化することが重要です。" },
+        { question: "日々の作業改善において、「やめる」「減らす」「変える」などの観点から業務を見直す考え方を表す頭文字は？", options: ["PDCA", "ECRS（改善の4原則）", "KYT", "QC7"], answer: 1, explanation: "ECRS（イクルス）は、Eliminate（排除:やめる）、Combine（結合:一緒にやる）、Rearrange（交換:順序を変える）、Simplify（簡素化:簡単にする）の略で、改善の定石です。" },
+        { question: "作業手順書（標準作業書）に関する記述で、間違っているものは？", options: ["新人を教育するための重要なツールである", "一度作成したら、絶対に書き換えてはいけない", "作業のバラツキをなくし、品質を安定させるためのものである", "安全に作業を行うためのポイントが記載されている"], answer: 1, explanation: "作業手順書は、現場の改善に合わせて常に最新の（より良い）状態にアップデートしていく「生きたマニュアル」でなければなりません。" }
       ],
       'qc': [
         { question: "業務改善の手法である「PDCAサイクル」。この『C』は何の略ですか？", options: ["Control（統制）", "Create（創造）", "Check（評価・点検）", "Communicate（伝達）"], answer: 2, explanation: "PDCAは Plan（計画）、Do（実行）、Check（評価・点検）、Action（改善）の頭文字です。実行した結果が計画通りか『Check』することが重要です。" },
@@ -148,7 +158,12 @@
         { question: "生産開始時の最初の製品（初品）に対して行う「初品検査」の最も重要な目的は？", options: ["その日のノルマを決めるため", "そのロット全体の不良発生を未然に防ぐため", "作業者の遅刻をチェックするため", "機械の掃除が終わったか確認するため"], answer: 1, explanation: "最初の製品が正しくできているかを確認することで、機械の設定ミスなどによる大量の不良品発生を防ぎます。" },
         { question: "現場で異常を発見した際にとるべき基本的な行動「ストップ・コール・ウェイト」の「ウェイト」とは？", options: ["機械の温度が下がるまで待つ", "勝手に判断せず、管理者の指示を待つ", "次の部品が来るまで待つ", "定時になるまで待つ"], answer: 1, explanation: "異常時には「止める（ストップ）」「呼ぶ（コール）」「待つ（ウェイト）」の徹底が、品質不良の流出や二次災害を防ぎます。" },
         { question: "職場のメンバーが小グループを編成し、自主的に問題解決や改善を行う活動を何と呼ぶ？", options: ["QCサークル活動", "労働組合活動", "レクリエーション", "5Sパトロール"], answer: 0, explanation: "現場の従業員が自主的にテーマを決め、QC手法を使って品質や業務の改善に取り組む小集団活動です。" },
-        { question: "製造工程における「ロット（Lot）」の意味として正しいものは？", options: ["不良品を捨てるゴミ箱", "同じ条件で生産された製品のひとまとまり（単位）", "製品を出荷するトラック", "工場の敷地の広さ"], answer: 1, explanation: "「ロット番号」で管理することで、不良が発生した際に、どの時期・どの材料で作られた製品に影響があるかを追跡（トレーサビリティ）できるようになります。" }
+        { question: "製造工程における「ロット（Lot）」の意味として正しいものは？", options: ["不良品を捨てるゴミ箱", "同じ条件で生産された製品のひとまとまり（単位）", "製品を出荷するトラック", "工場の敷地の広さ"], answer: 1, explanation: "「ロット番号」で管理することで、不良が発生した際に、どの時期・どの材料で作られた製品に影響があるかを追跡（トレーサビリティ）できるようになります。" },
+        { question: "製品の検査において「抜き取り検査」が適しているケースはどれか？", options: ["人命に関わる重要な部品の検査", "全数検査をすると製品が破壊されてしまう場合（破壊検査）", "検査に全くコストがかからない場合", "不良率が極めて高く、すべて調べる必要がある場合"], answer: 1, explanation: "強度テストなど、製品を壊さないと検査できない場合は全数検査ができないため、統計的手法を用いた「抜き取り検査」が行われます。" },
+        { question: "顧客からのクレームが発生した際、一番最初に行うべき対応はどれか？", options: ["責任者を決めて始末書を書かせる", "対象となるロットの製品の出荷を止め、被害の拡大を防ぐ（流出防止）", "原因がわかるまで顧客には連絡しない", "新しい生産ラインの設計を始める"], answer: 1, explanation: "品質異常発生時の鉄則です。まずは「疑わしいものをすべて止める（確保する）」ことで、それ以上の不良品が市場に出回るのを防ぐことが最優先です。" },
+        { question: "品質データにおいて、「平均値（中心）」からどのくらいデータが散らばっているかを表す統計上の用語は？", options: ["中央値", "標準偏差（ばらつき/シグマ）", "最大値", "モード"], answer: 1, explanation: "データのばらつきの大きさを表すのが標準偏差（σ：シグマ）です。品質管理ではこのばらつきをいかに小さくするかが重要になります。" },
+        { question: "ポカヨケの仕組みにおいて、異常が発生した際に機械を停止させる方式を「規制式」と呼びますが、異常をランプやブザーで作業者に知らせるだけの方式を何と呼ぶ？", options: ["注意式", "警報式", "警告式", "目視式"], answer: 1, explanation: "ブザーなどで知らせる「警報式」と、物理的に次の動作ができなくなる「規制式」があります。より確実なのは規制式です。" },
+        { question: "工程内の品質を作り込むための考え方で「後工程はお客様」という言葉があります。この意味として最も適切なのは？", options: ["後工程の作業員には敬語を使わなければならない", "後工程に不良品を流さないよう、自分の工程で確実に品質を保証する", "後工程から文句を言われたら、すべて謝る", "お客様のふりをして後工程を監視する"], answer: 1, explanation: "次の作業を行う人を「お客様」だと考えれば、不良品や作業しにくい状態のものを渡すことはできない、という品質保証の基本精神です。" }
       ],
       'safety': [
         { question: "「1件の重大事故の背後には、29件の軽微な事故があり、さらにその背景には300件のヒヤリハットがある」という法則は？", options: ["マーフィーの法則", "ハインリッヒの法則", "パレートの法則", "ムーアの法則"], answer: 1, explanation: "ハインリッヒの法則です。重大事故を防ぐためには、日頃の「ヒヤリ・ハット」の段階で対策を打つことが重要です。" },
@@ -167,7 +182,12 @@
         { question: "熱中症を予防するための指標として用いられる「WBGT値」の別名は？", options: ["気温", "湿度", "暑さ指数", "不快指数"], answer: 2, explanation: "WBGT（暑さ指数）は、気温だけでなく湿度や輻射熱を取り入れた指標で、労働環境での熱中症予防の基準として使われます。" },
         { question: "保護具の中で、騒音レベルが高い職場で聴力障害を防ぐために着用するものは？", options: ["保護メガネ", "耳栓・イヤーマフ", "防塵マスク", "安全靴"], answer: 1, explanation: "騒音性難聴は徐々に進行するため自覚しにくく、一度失われた聴力は回復しません。そのため耳栓などの保護具着用が必須です。" },
         { question: "機械のカバーが開いていると機械が動かない、あるいは動いている時にカバーを開けると自動停止する安全装置を何と呼ぶ？", options: ["ポカヨケ", "インターロック", "アンドン", "ブレーカー"], answer: 1, explanation: "インターロック機構により、「人間の不注意」があっても機械的に危険な状態を回避する仕組みです。" },
-        { question: "職場の安全や衛生状態を確認し、改善点を見つけるために定期的に現場を見回る活動は？", options: ["安全パトロール", "朝礼", "棚卸し", "工程内検査"], answer: 0, explanation: "安全管理者や委員が現場を巡回し、不安全な状態（危険箇所）や不安全な行動（ルール違反）がないかを確認し、改善を促す活動です。" }
+        { question: "職場の安全や衛生状態を確認し、改善点を見つけるために定期的に現場を見回る活動は？", options: ["安全パトロール", "朝礼", "棚卸し", "工程内検査"], answer: 0, explanation: "安全管理者や委員が現場を巡回し、不安全な状態（危険箇所）や不安全な行動（ルール違反）がないかを確認し、改善を促す活動です。" },
+        { question: "有機溶剤などの有害なガスが発生する作業場で、作業者の健康を守るために設置すべき設備は？", options: ["局所排気装置", "扇風機", "空気清浄機", "エアコン"], answer: 0, explanation: "有害なガスや粉塵を、作業者が吸い込む前に発生源の近くで吸い取って屋外へ排出する「局所排気装置」が有効です。" },
+        { question: "作業場において、安全のために通路と作業エリアを明確に分ける目的で床に引かれる線を何と呼ぶ？", options: ["ストップライン", "区画線（白線・黄線）", "ガイドライン", "センターライン"], answer: 1, explanation: "区画線（安全線）を引くことで、フォークリフトと歩行者の接触事故を防いだり、物の置き場所を明確にしたりする効果があります。" },
+        { question: "「感電」を防ぐための基本的な対策として、間違っているものは？", options: ["濡れた手で電気機器のスイッチに触れない", "漏電遮断器を設置する", "アース（接地）線を接続する", "コードが破れていたらビニールテープでぐるぐる巻きにして使い続ける"], answer: 3, explanation: "コードの被覆破れは漏電・感電・火災の大きな原因です。素人判断でテープ補修せず、安全管理者に報告して適切な修理・交換を行うべきです。" },
+        { question: "高所作業において、墜落による労働災害を防ぐために着用が義務付けられている保護具は？", options: ["安全靴", "墜落制止用器具（安全帯・フルハーネス）", "防塵マスク", "保護メガネ"], answer: 1, explanation: "一定の高さ以上の場所では、万が一足を踏み外しても地面に落下しないよう、フルハーネス型の墜落制止用器具の着用が原則義務化されています。" },
+        { question: "火災が発生した際、消火器を使う前に「一番最初」に行うべき行動は？", options: ["大声で「火事だ！」と周囲に知らせる", "窓をすべて開ける", "水を汲みに行く", "荷物をまとめる"], answer: 0, explanation: "火災発生時は、まず大声で周囲に知らせ、避難と初期消火の協力を求めることが鉄則です。一人で無理に消そうとすると逃げ遅れる危険があります。" }
       ],
       'maintenance': [
         { question: "設備保全において「機械が故障してから修理する」という考え方を何と呼びますか？", options: ["事後保全", "予防保全", "予知保全", "改良保全"], answer: 0, explanation: "故障が起きてから対応するのが事後保全（Breakdown Maintenance）です。予期せぬライン停止を引き起こすため、できるだけ減らすべきとされます。" },
@@ -186,7 +206,11 @@
         { question: "日常点検を確実に行うために、点検する箇所、項目、方法などを一覧表にしたものを何と呼ぶ？", options: ["点検チェックシート", "作業手順書", "QC工程表", "生産計画書"], answer: 0, explanation: "誰がやっても同じように点検ができるよう、チェックシートに基づいた点検を標準化することが重要です。" },
         { question: "メーターなどの計器類において、正常な範囲（適正値）と異常な範囲が一目でわかるように、色付きのテープなどを貼る工夫を何と呼ぶ？", options: ["見える化（限界表示）", "ブラックボックス化", "デジタル化", "マスキング"], answer: 0, explanation: "正常範囲を緑色、異常範囲を赤色でマーキングしておくことで、熟練者でなくても「異常」を瞬時に発見できるようになります。" },
         { question: "設備の故障原因を根本から解決するために、「なぜ」を複数回繰り返して真因を追求する手法を何と呼ぶ？", options: ["なぜなぜ分析", "PDCAサイクル", "KYT", "5S活動"], answer: 0, explanation: "「なぜ機械が止まった？→ヒューズが切れたから→なぜ切れた？→過電流が流れたから…」と深掘りし、表面的な対策ではなく再発防止策を導き出します。" },
-        { question: "空気圧を利用して機械を動かす装置（エアシリンダなど）において、空気が漏れている状態を示す「エア漏れ」の主な原因はどれか？", options: ["パッキンやシールの劣化", "電気コードの断線", "モーターの焼き付き", "潤滑油の入れすぎ"], answer: 0, explanation: "エア漏れは「シュー」という音で発見できます。パッキンなどの経年劣化が主な原因であり、放置するとエネルギーの大きなムダ（電気代ロス）に繋がります。" }
+        { question: "空気圧を利用して機械を動かす装置（エアシリンダなど）において、空気が漏れている状態を示す「エア漏れ」の主な原因はどれか？", options: ["パッキンやシールの劣化", "電気コードの断線", "モーターの焼き付き", "潤滑油の入れすぎ"], answer: 0, explanation: "エア漏れは「シュー」という音で発見できます。パッキンなどの経年劣化が主な原因であり、放置するとエネルギーの大きなムダ（電気代ロス）に繋がります。" },
+        { question: "モーターやポンプなどを繋ぐ「Vベルト」の点検項目として重要なのは「摩耗・ひび割れ」と、もう一つは？", options: ["色落ち", "適切な張り（テンション）", "重さ", "匂い"], answer: 1, explanation: "ベルトの張りが緩いとスリップして動力が伝わらず、張りすぎると軸受（ベアリング）に負荷がかかり故障の原因となります。" },
+        { question: "機械の回転を支える重要な部品である「ベアリング（軸受）」の寿命を縮める最大の原因はどれ？", options: ["適度な潤滑油", "グリス切れ・異物の混入", "一定の速度での回転", "室温での使用"], answer: 1, explanation: "ベアリングは潤滑が命です。油切れや、ゴミ・水分の混入が起こると、摩擦で異常発熱し「焼き付き」を起こして破損します。" },
+        { question: "保全の記録（故障履歴や点検結果）を残す最も大きなメリットは？", options: ["作業者がサボっていないか監視するため", "過去のデータから、次に故障しやすい時期や箇所を予測（分析）するため", "上司に褒められるため", "書類の束を増やして仕事をしている感を出すため"], answer: 1, explanation: "「いつ・どこが・なぜ壊れたか」の記録（MTBFやMTTRのデータ）は、事後保全から予防保全・予知保全へステップアップするための最も重要な財産です。" },
+        { question: "ネジを締める際、ボルトとナットの間に挟み、緩みを防止したり部品を傷つけないようにする環状の部品は？", options: ["ピン", "ワッシャー（座金）", "スプリング", "ガスケット"], answer: 1, explanation: "ワッシャー（座金）には、平座金（面圧を分散させる）や、ばね座金（スプリングの力で緩みを防ぐ）などがあり、締結の信頼性を高める重要な部品です。" }
       ],
       'plastic_magnet': [
         { question: "プラスチックマグネット（ボンド磁石）は、主に何と何を混ぜ合わせて作られますか？", options: ["鉄とアルミニウム", "磁性粉（フェライトなど）と樹脂（プラスチックやゴム）", "銅とプラスチック", "希土類元素とガラス"], answer: 1, explanation: "磁石の粉末（磁性粉）に、つなぎ（バインダー）としてプラスチックやゴムなどの樹脂を練り込んで作られます。" },
@@ -205,7 +229,12 @@
         { question: "プラスチックマグネットの材料として、成形機に投入しやすいように数ミリ程度の粒状に加工したものを何と呼ぶ？", options: ["インゴット", "ペレット", "パウダー", "スラリー"], answer: 1, explanation: "混練した材料を冷やして細かくカットし、射出成形機や押出成形機のホッパー（投入口）に入れやすい粒状にしたものがペレットです。" },
         { question: "ナイロンやPPSなどの「熱可塑性（ねつかそせい）樹脂」を用いたプラマグの特徴はどれ？", options: ["熱を加えると再び溶けるため、リサイクルが可能である", "一度固まると二度と溶けない", "燃やすと有害ガスが出る", "ゴムのように伸び縮みする"], answer: 0, explanation: "熱可塑性樹脂はチョコレートのように熱で溶け、冷えると固まる性質があるため、不良品や端材を粉砕して再利用（リサイクル）しやすい特徴があります。" },
         { question: "シート状のゴムマグネットを連続して薄く広く成形する際によく使われる、2本以上のローラーの間に材料を通して圧延する加工法は？", options: ["カレンダー加工", "プレス加工", "切削加工", "鋳造加工"], answer: 0, explanation: "熱して柔らかくした材料を、隙間を調整したローラーの間に通すことで、均一な厚みのシート状に引き延ばす工法です。" },
-        { question: "ボンド磁石が焼結磁石に比べて「寸法精度が出しやすい（狙ったサイズにぴったり作れる）」理由として適切なものは？", options: ["柔らかいので後から削りやすいから", "焼結（焼き固める）工程による大きな収縮がないから", "水分を多く含んでいるから", "型を使わずに手作業で作るから"], answer: 1, explanation: "焼結磁石は高温で焼き固める際に大きく縮むため精度を出しにくいですが、プラマグは金型の寸法のまま固まるため、高い精度で製品を作ることができます。" }
+        { question: "ボンド磁石が焼結磁石に比べて「寸法精度が出しやすい（狙ったサイズにぴったり作れる）」理由として適切なものは？", options: ["柔らかいので後から削りやすいから", "焼結（焼き固める）工程による大きな収縮がないから", "水分を多く含んでいるから", "型を使わずに手作業で作るから"], answer: 1, explanation: "焼結磁石は高温で焼き固める際に大きく縮むため精度を出しにくいですが、プラマグは金型の寸法のまま固まるため、高い精度で製品を作ることができます。" },
+        { question: "磁石の性質を示す「ヒステリシスカーブ（B-Hカーブ）」。縦軸は磁束密度（B）ですが、横軸（H）は何を表している？", options: ["温度", "時間", "磁界の強さ", "重量"], answer: 2, explanation: "外部からかける磁界の強さ（H）と、磁石が帯びる磁束密度（B）の関係を表したグラフで、磁石の基本性能を評価する重要な指標です。" },
+        { question: "着磁された磁石が、他の磁石や鉄などの影響を受けずに、単独で空気中にある時に発生している磁束密度のことを何と呼ぶ？", options: ["残留磁束密度 (Br)", "パーミアンス係数 (Pc)", "保磁力 (Hcb)", "動作点"], answer: 0, explanation: "残留磁束密度（Br）は、外部の磁界をゼロに戻した時に磁石に残っている磁力の強さで、磁石のポテンシャルを示す代表的な数値です。" },
+        { question: "磁石の磁力を測定する際に使われる、磁束密度を直接測るための代表的な計測機器は？", options: ["オシロスコープ", "テスター", "ガウスメーター（テスラメーター）", "ノギス"], answer: 2, explanation: "ガウスメーター（テスラメーター）のセンサー部分（ホール素子）を磁石の表面に当てることで、その部分の表面磁束密度を測定します。" },
+        { question: "プラスチックマグネットの押出成形において、製品が冷えて固まる際に設定寸法よりも縮んでしまう割合を何と呼ぶ？", options: ["歩留まり率", "成形収縮率", "膨張係数", "充填率"], answer: 1, explanation: "プラスチック成分が含まれるため、冷却時に必ず収縮が起こります。金型を作る際は、この「成形収縮率」をあらかじめ計算して少し大きめに設計します。" },
+        { question: "モーター用の円筒形プラスチックマグネットで、外周（または内周）にN極とS極が交互に斜めに配置された着磁パターンを何と呼ぶ？", options: ["アキシャル着磁", "ラジアル着磁", "スキュー着磁", "平行着磁"], answer: 2, explanation: "極の境界線を斜め（スキュー）にすることで、モーターが回転する際のトルク変動（コギング）を滑らかにし、振動や騒音を減らす効果があります。プラマグの得意分野です。" }
       ]
     };
 
@@ -297,9 +326,14 @@
       const [isAnswered, setIsAnswered] = useState(false);
       
       const [wrongAnswers, setWrongAnswers] = useState([]);
+      
+      // クイズデータとローディング状態
+      const [quizData, setQuizData] = useState(DEFAULT_QUIZ_QUESTIONS);
+      const [isLoadingData, setIsLoadingData] = useState(false);
+
       const [savedScores, setSavedScores] = useState(() => {
         try {
-          const item = window.localStorage.getItem('maguex_quiz_scores_v2'); // IDを変更してスコアリセット
+          const item = window.localStorage.getItem('maguex_quiz_scores_v3'); 
           return item ? JSON.parse(item) : {};
         } catch (error) {
           console.error(error);
@@ -307,11 +341,51 @@
         }
       });
 
+      // --- スプレッドシート読み込み処理 ---
+      useEffect(() => {
+        if (SPREADSHEET_CSV_URL && SPREADSHEET_CSV_URL.trim() !== "") {
+          setIsLoadingData(true);
+          Papa.parse(SPREADSHEET_CSV_URL, {
+            download: true,
+            header: true,
+            complete: (results) => {
+              const newData = { '5s': [], 'qc': [], 'safety': [], 'maintenance': [], 'plastic_magnet': [] };
+              let isValidData = false;
+              
+              results.data.forEach(row => {
+                const cat = row['カテゴリID'] ? row['カテゴリID'].trim() : '';
+                if (cat && newData[cat] && row['問題']) {
+                  newData[cat].push({
+                    question: row['問題'],
+                    options: [row['選択肢1'], row['選択肢2'], row['選択肢3'], row['選択肢4']].filter(Boolean),
+                    answer: parseInt(row['正解番号']) - 1,
+                    explanation: row['解説'] || ""
+                  });
+                  isValidData = true;
+                }
+              });
+
+              if (isValidData) {
+                setQuizData(newData);
+                console.log("スプレッドシートから問題を読み込みました！");
+              } else {
+                console.warn("スプレッドシートの形式が正しくないか、データがありません。内蔵データを使用します。");
+              }
+              setIsLoadingData(false);
+            },
+            error: (err) => {
+              console.error("スプレッドシートの読み込みエラー:", err);
+              setIsLoadingData(false);
+            }
+          });
+        }
+      }, []);
+
       const saveScoreToLocal = (categoryId, newScore) => {
         try {
           const updatedScores = { ...savedScores, [categoryId]: newScore };
           setSavedScores(updatedScores);
-          window.localStorage.setItem('maguex_quiz_scores_v2', JSON.stringify(updatedScores));
+          window.localStorage.setItem('maguex_quiz_scores_v3', JSON.stringify(updatedScores));
         } catch (error) {
           console.error("保存に失敗しました", error);
         }
@@ -322,12 +396,15 @@
         let shuffledQuestions = [];
 
         if (categoryId === 'comprehensive') {
-          // 総合テスト：全カテゴリの問題を結合してシャッフルし、20問抽出
-          const allQuestions = Object.values(QUIZ_QUESTIONS).flat();
+          const allQuestions = Object.values(quizData).flat();
           shuffledQuestions = shuffleArray(allQuestions).slice(0, COMPREHENSIVE_QUESTIONS_COUNT);
         } else {
-          // 通常テスト：選択されたカテゴリをシャッフルし、10問抽出
-          shuffledQuestions = shuffleArray(QUIZ_QUESTIONS[categoryId]).slice(0, NORMAL_QUESTIONS_COUNT);
+          shuffledQuestions = shuffleArray(quizData[categoryId]).slice(0, NORMAL_QUESTIONS_COUNT);
+        }
+
+        if (shuffledQuestions.length === 0) {
+           alert("このカテゴリにはまだ問題が登録されていません。");
+           return;
         }
 
         setCurrentQuizList(shuffledQuestions);
@@ -373,6 +450,7 @@
           setIsAnswered(false);
           window.scrollTo(0,0);
         } else {
+          // ★修正：スコアはすでに加算されているため、そのまま保存します
           saveScoreToLocal(activeCategory, score);
           setView('result');
           window.scrollTo(0,0);
@@ -399,60 +477,73 @@
               </p>
             </div>
 
-            {/* 総合テスト（特別枠） */}
-            <div className="mb-8">
-              <button onClick={() => startQuiz(specialCategory.id)} className={`w-full bg-slate-800 border-2 border-yellow-500/50 hover:border-yellow-400 rounded-2xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-yellow-900/40 group relative overflow-hidden flex flex-col sm:flex-row items-center gap-6`}>
-                <div className={`absolute top-0 right-0 w-48 h-48 bg-yellow-500/10 rounded-bl-full -mr-16 -mt-16 transition-transform group-hover:scale-110`}></div>
-                <div className="relative z-10 w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center border border-yellow-500/30 flex-shrink-0 group-hover:border-yellow-400 transition-colors shadow-[0_0_15px_rgba(234,179,8,0.2)]">
-                  {specialCategory.icon}
-                </div>
-                <div className="relative z-10 flex-1 text-center sm:text-left">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 gap-2">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-white">{specialCategory.name}</h2>
-                    {savedScores[specialCategory.id] !== undefined && (
-                      <div className="bg-slate-900 px-4 py-1.5 rounded-full border border-yellow-500/30 text-sm font-semibold inline-block mx-auto sm:mx-0">
-                        <span className="text-slate-400">前回: </span>
-                        <span className={savedScores[specialCategory.id] >= 16 ? "text-yellow-400" : "text-amber-400"}>{savedScores[specialCategory.id]} / {COMPREHENSIVE_QUESTIONS_COUNT}問</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-4">{specialCategory.description}</p>
-                  <div className={`inline-flex items-center text-yellow-400 font-bold text-base bg-yellow-500/10 px-4 py-2 rounded-lg`}>
-                    全20問のテストを開始する <i className="fa-solid fa-chevron-right ml-2 group-hover:translate-x-1 transition-transform"></i>
-                  </div>
-                </div>
-              </button>
-            </div>
-
-            {/* 通常カテゴリ（グリッド） */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-              {normalCategories.map((category) => {
-                const previousScore = savedScores[category.id];
-                return (
-                  <button key={category.id} onClick={() => startQuiz(category.id)} className={`bg-slate-800 border-2 border-slate-700 ${category.theme.borderHover} rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${category.theme.shadowHover} group relative overflow-hidden flex flex-col justify-between h-full`}>
-                    <div>
-                      <div className={`absolute top-0 right-0 w-32 h-32 ${category.theme.bgLight} rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110`}></div>
-                      <div className="relative z-10">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className={`w-14 h-14 bg-slate-900 rounded-xl flex items-center justify-center border border-slate-700 ${category.theme.borderGroupHover} transition-colors`}>{category.icon}</div>
-                          {previousScore !== undefined && (
-                            <div className="bg-slate-900 px-3 py-1 rounded-full border border-slate-700 text-xs font-semibold">
-                              <span className="text-slate-400">前回: </span>
-                              <span className={previousScore >= 8 ? "text-emerald-400" : "text-amber-400"}>{previousScore} / {NORMAL_QUESTIONS_COUNT}問</span>
-                            </div>
-                          )}
-                        </div>
-                        <h2 className="text-xl font-bold text-white mb-2">{category.name}</h2>
-                        <p className="text-sm text-slate-400 leading-relaxed mb-6">{category.description}</p>
-                      </div>
+            {isLoadingData ? (
+              <div className="text-center py-16">
+                <i className="fa-solid fa-cloud-arrow-down fa-bounce text-5xl text-blue-500 mb-6"></i>
+                <p className="text-lg text-slate-300 font-bold animate-pulse">スプレッドシートから最新の問題を読み込み中...</p>
+              </div>
+            ) : (
+              <>
+                {/* 総合テスト（特別枠） */}
+                <div className="mb-8">
+                  <button onClick={() => startQuiz(specialCategory.id)} className={`w-full bg-slate-800 border-2 border-yellow-500/50 hover:border-yellow-400 rounded-2xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-yellow-900/40 group relative overflow-hidden flex flex-col sm:flex-row items-center gap-6`}>
+                    <div className={`absolute top-0 right-0 w-48 h-48 bg-yellow-500/10 rounded-bl-full -mr-16 -mt-16 transition-transform group-hover:scale-110`}></div>
+                    <div className="relative z-10 w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center border border-yellow-500/30 flex-shrink-0 group-hover:border-yellow-400 transition-colors shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+                      {specialCategory.icon}
                     </div>
-                    <div className={`relative z-10 flex items-center ${category.theme.text} font-semibold text-sm mt-auto`}>
-                      10問テストを開始 <i className="fa-solid fa-chevron-right ml-1 group-hover:translate-x-1 transition-transform"></i>
+                    <div className="relative z-10 flex-1 text-center sm:text-left">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 gap-2">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-white">{specialCategory.name}</h2>
+                        {savedScores[specialCategory.id] !== undefined && (
+                          <div className="bg-slate-900 px-4 py-1.5 rounded-full border border-yellow-500/30 text-sm font-semibold inline-block mx-auto sm:mx-0">
+                            <span className="text-slate-400">前回: </span>
+                            <span className={savedScores[specialCategory.id] >= 16 ? "text-yellow-400" : "text-amber-400"}>{savedScores[specialCategory.id]} / {COMPREHENSIVE_QUESTIONS_COUNT}問</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-4">{specialCategory.description}</p>
+                      <div className={`inline-flex items-center text-yellow-400 font-bold text-base bg-yellow-500/10 px-4 py-2 rounded-lg`}>
+                        全20問のテストを開始する <i className="fa-solid fa-chevron-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+                      </div>
                     </div>
                   </button>
-                );
-              })}
-            </div>
+                </div>
+
+                {/* 通常カテゴリ（グリッド） */}
+                <div className="grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+                  {normalCategories.map((category) => {
+                    const previousScore = savedScores[category.id];
+                    const qCount = quizData[category.id] ? quizData[category.id].length : 0;
+                    const targetCount = Math.min(qCount, NORMAL_QUESTIONS_COUNT);
+
+                    return (
+                      <button key={category.id} onClick={() => startQuiz(category.id)} className={`bg-slate-800 border-2 border-slate-700 ${category.theme.borderHover} rounded-2xl p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${category.theme.shadowHover} group relative overflow-hidden flex flex-col justify-between h-full ${qCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={qCount === 0}>
+                        <div>
+                          <div className={`absolute top-0 right-0 w-32 h-32 ${category.theme.bgLight} rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110`}></div>
+                          <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-4">
+                              <div className={`w-14 h-14 bg-slate-900 rounded-xl flex items-center justify-center border border-slate-700 ${category.theme.borderGroupHover} transition-colors`}>{category.icon}</div>
+                              {previousScore !== undefined && qCount > 0 && (
+                                <div className="bg-slate-900 px-3 py-1 rounded-full border border-slate-700 text-xs font-semibold">
+                                  <span className="text-slate-400">前回: </span>
+                                  <span className={previousScore >= (targetCount * 0.8) ? "text-emerald-400" : "text-amber-400"}>{previousScore} / {targetCount}問</span>
+                                </div>
+                              )}
+                            </div>
+                            <h2 className="text-xl font-bold text-white mb-2">{category.name}</h2>
+                            <p className="text-sm text-slate-400 leading-relaxed mb-6">{category.description}</p>
+                          </div>
+                        </div>
+                        <div className={`relative z-10 flex items-center ${category.theme.text} font-semibold text-sm mt-auto`}>
+                          {qCount > 0 ? `${targetCount}問テストを開始 ` : '問題がありません '}
+                          <i className="fa-solid fa-chevron-right ml-1 group-hover:translate-x-1 transition-transform"></i>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         );
       };
@@ -517,11 +608,28 @@
       };
 
       const ResultScreen = () => {
+        const [isCopied, setIsCopied] = useState(false);
         const categoryInfo = QUIZ_CATEGORIES.find(c => c.id === activeCategory);
         const percentage = Math.round((score / currentQuizList.length) * 100);
         
-        // 新ランクシステム
         const rankInfo = getRankInfo(percentage);
+
+        const handleCopyReport = () => {
+          const reportText = `『マグエックス 生産に関する基礎知識クイズ』\n【${categoryInfo.name}】に挑戦しました！\n結果：${score} / ${currentQuizList.length}問正解 (${percentage}%)\nランク：${rankInfo.rank}（${rankInfo.title}）`;
+          
+          const textArea = document.createElement("textarea");
+          textArea.value = reportText;
+          document.body.appendChild(textArea);
+          textArea.select();
+          try {
+            document.execCommand('copy');
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+          } catch (err) {
+            console.error('コピーに失敗しました', err);
+          }
+          document.body.removeChild(textArea);
+        };
 
         return (
           <div className="max-w-3xl mx-auto py-12 px-4 animate-fadeIn pb-24">
@@ -555,6 +663,22 @@
                  percentage >= 60 ? "基礎はできています。解説を読んで、さらに知識を深めましょう。" :
                  "まずは基礎固めからです！もう一度チャレンジして用語に慣れていきましょう。"}
               </p>
+
+              <div className="mb-10">
+                <button 
+                  onClick={handleCopyReport} 
+                  className={`px-8 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 mx-auto w-full sm:w-auto ${
+                    isCopied ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600'
+                  }`}
+                >
+                  {isCopied ? (
+                    <><i className="fa-solid fa-check"></i> コピーしました！</>
+                  ) : (
+                    <><i className="fa-solid fa-paste"></i> 結果をコピーして報告</>
+                  )}
+                </button>
+                <p className="text-xs text-slate-500 mt-2">Slackに貼り付けて結果を報告できます</p>
+              </div>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button onClick={() => startQuiz(activeCategory)} className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold transition text-sm sm:text-base">
