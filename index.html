@@ -223,9 +223,10 @@
       const [quizData, setQuizData] = useState(DEFAULT_QUIZ_QUESTIONS);
       const [isLoadingData, setIsLoadingData] = useState(false);
 
+      // ★保存用のIDを「v5」に変更し、過去のバグのあるデータをリセットしました
       const [savedScores, setSavedScores] = useState(() => {
         try {
-          const item = window.localStorage.getItem('maguex_quiz_scores_v4'); 
+          const item = window.localStorage.getItem('maguex_quiz_scores_v5'); 
           return item ? JSON.parse(item) : {};
         } catch (error) {
           console.error(error);
@@ -276,7 +277,7 @@
         try {
           const updatedScores = { ...savedScores, [categoryId]: newScore };
           setSavedScores(updatedScores);
-          window.localStorage.setItem('maguex_quiz_scores_v4', JSON.stringify(updatedScores));
+          window.localStorage.setItem('maguex_quiz_scores_v5', JSON.stringify(updatedScores));
         } catch (error) {
           console.error("保存に失敗しました", error);
         }
@@ -298,6 +299,7 @@
            return;
         }
 
+        // 選択肢のシャッフル
         const randomizedQuestions = shuffledQuestions.map(q => {
           const correctText = q.options[q.answer];
           const newOptions = shuffleArray([...q.options]);
@@ -327,6 +329,7 @@
         window.scrollTo(0,0);
       };
 
+      // ★スコアの加算処理を確実に修正しました
       const handleAnswer = (index) => {
         if (isAnswered) return;
         setSelectedOption(index);
@@ -334,7 +337,8 @@
         
         const currentQ = currentQuizList[currentQuestionIndex];
         if (index === currentQ.answer) {
-          setScore(score + 1);
+          // すでに正解している場合、ここで確実に+1されます
+          setScore(prev => prev + 1);
         } else {
           setWrongAnswers(prev => [...prev, {
             question: currentQ.question,
@@ -345,6 +349,7 @@
         }
       };
 
+      // ★結果画面へ行くときに、余計な足し算をしないように修正しました
       const nextQuestion = () => {
         if (currentQuestionIndex + 1 < currentQuizList.length) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -352,6 +357,7 @@
           setIsAnswered(false);
           window.scrollTo(0,0);
         } else {
+          // handleAnswerで既に計算されている点数をそのまま保存します
           saveScoreToLocal(activeCategory, score);
           setView('result');
           window.scrollTo(0,0);
